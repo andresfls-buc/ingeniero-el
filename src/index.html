@@ -1,19 +1,999 @@
 <!doctype html>
-<html>
-  <head>
-    <base target="_top" />
-  </head>
-  <body>
-    <h2>Sistema APU</h2>
+<html lang="es">
+<head>
+  <base target="_top" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sistema APU</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <button onclick="initDB()">Crear Base de Datos</button>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #f0f2f5;
+      color: #222;
+    }
 
-    <script>
-      function initDB() {
-        google.script.run
-          .withSuccessHandler(() => alert("DB creada"))
-          .setupDatabase();
+    /* ── TOOLBAR ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: #1a237e;
+      color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .toolbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
+    .toolbar h2 { font-size: 14px; font-weight: 600; flex: 1; }
+    .estado-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* ── BOTONES ── */
+    .btn { border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 6px 14px; font-weight: 500; }
+    .btn-primary  { background: #fff; color: #1a237e; }
+    .btn-back     { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
+    .btn-add      { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+    .btn-add:hover { background: rgba(255,255,255,0.25); }
+    .btn-del      { background: none; border: none; color: #c62828; cursor: pointer; font-size: 14px; padding: 0 4px; }
+    .btn-del:hover { color: #b71c1c; }
+    .btn-sel      { background: #1a237e; color: #fff; border: none; border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+    .btn-sel:hover { background: #283593; }
+    .btn-open     { background: none; border: 1px solid #1a237e; color: #1a237e; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-size: 11px; }
+    .btn-edit-p   { background: none; border: none; color: #888; cursor: pointer; font-size: 11px; padding: 0 2px; }
+    .btn-edit-p:hover { color: #1a237e; }
+
+    /* ── CONTENEDOR ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+    /* ── CARD ── */
+    .card {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    /* ── SECCIÓN HEADER ── */
+    .sec-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      color: #fff;
+    }
+    .sec-equipos   .sec-header { background: #1565c0; }
+    .sec-materiales .sec-header { background: #2e7d32; }
+    .sec-mano-obra  .sec-header { background: #e65100; }
+    .sec-otros      .sec-header { background: #546e7a; }
+    .sec-totales    .sec-header { background: #37474f; }
+    .sec-general    .sec-header { background: #37474f; }
+
+    /* ── FORMULARIO GENERAL ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      color: #666;
+      letter-spacing: .4px;
+      margin-bottom: 4px;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      outline: none;
+    }
+    .form-group input:focus { border-color: #1a237e; }
+
+    /* ── TABLAS APU ── */
+    .apu-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .apu-table thead th {
+      background: #f5f5f5;
+      padding: 7px 10px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      color: #555;
+      letter-spacing: .3px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .apu-table tbody tr:hover { background: #fafafa; }
+    .apu-table td {
+      padding: 5px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    .cell-input {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      padding: 4px 6px;
+      font-size: 12px;
+      background: transparent;
+      outline: none;
+    }
+    .cell-input:focus { border-color: #1a237e; background: #fff; }
+    .desc-input { min-width: 160px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .vp  { font-weight: 600; color: #222; }
+
+    /* ── SUBTOTAL ── */
+    .subtotal-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 14px;
+      font-weight: 700;
+      font-size: 12px;
+      background: #fafafa;
+      border-top: 1px solid #e0e0e0;
+      color: #333;
+    }
+    .subtotal-row span { font-size: 13px; }
+
+    /* ── TOTALES ── */
+    .totales-body { padding: 12px 14px; }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+    }
+    .total-row.final {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a237e;
+      border-bottom: none;
+      border-top: 2px solid #1a237e;
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+    .total-row .label { flex: 1; color: #444; }
+    .total-row .pct-wrap { display: flex; align-items: center; gap: 4px; color: #666; }
+    .pct-input {
+      width: 54px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      padding: 3px 6px;
+      font-size: 12px;
+      text-align: right;
+    }
+    .total-val { min-width: 130px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* ── LISTA DE APUs ── */
+    .list-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .list-table thead th {
+      background: #e8eaf6;
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a237e;
+      letter-spacing: .3px;
+    }
+    .list-table tbody tr { cursor: pointer; }
+    .list-table tbody tr:hover { background: #f3f4fc; }
+    .list-table td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+    .list-table .num { text-align: right; }
+    .empty { padding: 32px; text-align: center; color: #888; }
+
+    /* ── BADGE ── */
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: #e8eaf6;
+      color: #283593;
+      white-space: nowrap;
+    }
+
+    /* ── MODAL ── */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: #fff;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 780px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid #eee;
+    }
+    .modal-header h3 { font-size: 14px; color: #1a237e; }
+    .btn-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #666; }
+    .modal-filtros {
+      display: flex;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid #eee;
+    }
+    .modal-filtros input, .modal-filtros select {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 7px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+    .modal-filtros input { flex: 1; }
+    .modal-filtros input:focus, .modal-filtros select:focus { border-color: #1a237e; }
+    .modal-results {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .modal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .modal-table thead th {
+      background: #f5f5f5;
+      padding: 7px 12px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      color: #555;
+      position: sticky;
+      top: 0;
+    }
+    .modal-table tbody tr:hover { background: #f3f4fc; }
+    .modal-table td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .modal-table .num { text-align: right; }
+
+    /* ── LOADING ── */
+    .loading { text-align: center; padding: 40px; color: #888; }
+    .mono { font-family: monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     VISTA: LISTA DE APUs
+════════════════════════════════════════════════ -->
+<div id="v-lista">
+  <div class="toolbar">
+    <h1>Sistema APU</h1>
+    <button class="btn btn-primary" onclick="nuevoAPU()">+ Nuevo APU</button>
+  </div>
+  <div class="container">
+    <div class="card">
+      <div id="lista-container" class="loading">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     VISTA: FORMULARIO APU
+════════════════════════════════════════════════ -->
+<div id="v-apu" style="display:none">
+  <div class="toolbar">
+    <button class="btn btn-back" onclick="mostrarLista()">← Volver</button>
+    <h2 id="apu-titulo">Nuevo APU</h2>
+    <span class="estado-tag" id="apu-estado"></span>
+  </div>
+
+  <div class="container">
+
+    <!-- DATOS GENERALES -->
+    <div class="card sec-general">
+      <div class="sec-header"><span>DATOS GENERALES</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>OBRA / CLIENTE</label>
+          <input id="f-cliente" type="text" placeholder="Nombre del cliente o dirección" onblur="guardarCabeza()">
+        </div>
+        <div class="form-group">
+          <label>ACTIVIDAD</label>
+          <input id="f-actividad" type="text" placeholder="Ej: Instalación ductería, tubería..." onblur="guardarCabeza()">
+        </div>
+        <div class="form-group">
+          <label>ÍTEM</label>
+          <input id="f-item" type="text" placeholder="Código del ítem" onblur="guardarCabeza()">
+        </div>
+        <div class="form-group">
+          <label>UNIDAD</label>
+          <input id="f-unidad" type="text" placeholder="m², und, ml..." onblur="guardarCabeza()">
+        </div>
+      </div>
+    </div>
+
+    <!-- EQUIPOS -->
+    <div class="card sec-equipos">
+      <div class="sec-header">
+        <span>A — EQUIPOS</span>
+        <button class="btn-add" onclick="abrirBusqueda('EQUIPO')">+ Agregar Equipo</button>
+      </div>
+      <table class="apu-table">
+        <thead>
+          <tr>
+            <th style="min-width:200px">EQUIPO</th>
+            <th style="width:80px">CANT. (a)</th>
+            <th style="width:120px">TARIFA/DÍA INSTAL. (b)</th>
+            <th style="width:140px">RENDIMIENTO UND/DÍA (c)</th>
+            <th style="width:140px">VALOR PARCIAL (a×b/c)</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="body-equipos"></tbody>
+      </table>
+      <div class="subtotal-row">SUBTOTAL (A) <span id="sub-equipos">$ 0</span></div>
+    </div>
+
+    <!-- MATERIALES -->
+    <div class="card sec-materiales">
+      <div class="sec-header">
+        <span>B — MATERIALES</span>
+        <button class="btn-add" onclick="abrirBusqueda('MATERIAL')">+ Agregar Material</button>
+      </div>
+      <table class="apu-table">
+        <thead>
+          <tr>
+            <th style="min-width:220px">MATERIAL</th>
+            <th style="width:60px">UND.</th>
+            <th style="width:140px">PRECIO/UNIDAD (d)</th>
+            <th style="width:110px">CANTIDAD (e)</th>
+            <th style="width:140px">VALOR PARCIAL (d×e)</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="body-materiales"></tbody>
+      </table>
+      <div class="subtotal-row">SUBTOTAL (B) <span id="sub-materiales">$ 0</span></div>
+    </div>
+
+    <!-- MANO DE OBRA -->
+    <div class="card sec-mano-obra">
+      <div class="sec-header">
+        <span>C — MANO DE OBRA</span>
+        <button class="btn-add" onclick="abrirBusqueda('MANO_OBRA')">+ Agregar Mano de Obra</button>
+      </div>
+      <table class="apu-table">
+        <thead>
+          <tr>
+            <th style="min-width:200px">DESCRIPCIÓN</th>
+            <th style="width:80px">CANT. (f)</th>
+            <th style="width:130px">SALARIO INTEGRAL (g)</th>
+            <th style="width:140px">RENDIMIENTO UND/DÍA (h)</th>
+            <th style="width:140px">VALOR PARCIAL (f×g/h)</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="body-mano-obra"></tbody>
+      </table>
+      <div class="subtotal-row">SUBTOTAL (C) <span id="sub-mano-obra">$ 0</span></div>
+    </div>
+
+    <!-- OTROS -->
+    <div class="card sec-otros">
+      <div class="sec-header">
+        <span>D — OTROS CONCEPTOS</span>
+        <button class="btn-add" onclick="agregarOtro()">+ Agregar Concepto</button>
+      </div>
+      <table class="apu-table">
+        <thead>
+          <tr>
+            <th style="min-width:200px">DESCRIPCIÓN</th>
+            <th style="width:140px">VALOR TOTAL (i)</th>
+            <th style="width:140px">CANTIDAD UND. (j)</th>
+            <th style="width:140px">VALOR PARCIAL (i/j)</th>
+            <th style="width:32px"></th>
+          </tr>
+        </thead>
+        <tbody id="body-otros"></tbody>
+      </table>
+      <div class="subtotal-row">SUBTOTAL (D) <span id="sub-otros">$ 0</span></div>
+    </div>
+
+    <!-- TOTALES -->
+    <div class="card sec-totales">
+      <div class="sec-header"><span>RESUMEN</span></div>
+      <div class="totales-body">
+        <div class="total-row">
+          <span class="label">E — COSTO DIRECTO &nbsp;<small style="color:#999">(A + B + C + D)</small></span>
+          <span class="total-val" id="costo-directo">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">Administración</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-admin" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="total-val" id="val-admin">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">Imprevistos</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-imprevistos" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="total-val" id="val-imprevistos">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">Utilidad</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-utilidad" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="total-val" id="val-utilidad">$ 0</span>
+        </div>
+        <div class="total-row final">
+          <span class="label">TOTAL VALOR UNITARIO</span>
+          <span class="total-val" id="total-final">$ 0</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div><!-- /v-apu -->
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: BÚSQUEDA DE RECURSOS
+════════════════════════════════════════════════ -->
+<div id="modal" onclick="cerrarModalFuera(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-titulo">Buscar</h3>
+      <button class="btn-close" onclick="cerrarModal()">✕</button>
+    </div>
+    <div class="modal-filtros">
+      <input id="m-query" type="text" placeholder="Buscar por nombre..." oninput="filtrarModal()">
+      <select id="m-cat" onchange="filtrarModal()" style="display:none">
+        <option value="">Todas las categorías</option>
+      </select>
+    </div>
+    <div class="modal-results">
+      <table class="modal-table">
+        <thead id="modal-thead"></thead>
+        <tbody id="modal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const COP = v => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', maximumFractionDigits: 0
+  }).format(v || 0);
+
+  // ── ESTADO GLOBAL ──
+  let bd         = { materiales: [], manoObra: [], equipos: [] };
+  let apuActual  = null;   // { id, ... }
+  let tipoModal  = null;
+  // filasLocales guarda el estado de cada fila en el cliente para cálculos inmediatos
+  let filas      = { EQUIPO: {}, MATERIAL: {}, MANO_OBRA: {}, OTRO: {} };
+
+  // ═══ INICIALIZACIÓN ═══════════════════════════════════════════════════════
+  function init() {
+    google.script.run
+      .withSuccessHandler(data => { bd = data; mostrarLista(); })
+      .withFailureHandler(err  => alert("Error cargando base de datos: " + err.message))
+      .cargarTodosBD();
+  }
+
+  // ═══ VISTA: LISTA ════════════════════════════════════════════════════════
+  function mostrarLista() {
+    document.getElementById("v-lista").style.display = "";
+    document.getElementById("v-apu").style.display   = "none";
+    document.getElementById("lista-container").innerHTML = '<div class="loading">Cargando APUs...</div>';
+    google.script.run
+      .withSuccessHandler(renderLista)
+      .withFailureHandler(err => document.getElementById("lista-container").innerHTML = "Error: " + err.message)
+      .listarAPUs();
+  }
+
+  function renderLista(apus) {
+    const el = document.getElementById("lista-container");
+    if (!apus || apus.length === 0) {
+      el.innerHTML = '<p class="empty">No hay APUs. Crea el primero con el botón "+" arriba.</p>';
+      return;
+    }
+    el.innerHTML = `<table class="list-table">
+      <thead><tr>
+        <th>ÍTEM</th><th>CLIENTE / OBRA</th><th>ACTIVIDAD</th>
+        <th class="num">COSTO NETO</th><th>FECHA</th><th></th>
+      </tr></thead>
+      <tbody>${apus.map(a => `<tr>
+        <td class="mono">${a.codigo_item || '—'}</td>
+        <td>${a.cliente || a.descripcion || '—'}</td>
+        <td>${a.actividad || '—'}</td>
+        <td class="num">${COP(a.costo_neto)}</td>
+        <td>${a.fecha || '—'}</td>
+        <td><button class="btn-open" onclick="abrirAPU(${a.id})">Abrir →</button></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  // ═══ ABRIR / CREAR APU ════════════════════════════════════════════════════
+  function nuevoAPU() {
+    apuActual = null;
+    filas     = { EQUIPO: {}, MATERIAL: {}, MANO_OBRA: {}, OTRO: {} };
+    limpiarFormulario();
+    document.getElementById("v-lista").style.display = "none";
+    document.getElementById("v-apu").style.display   = "";
+    document.getElementById("apu-titulo").textContent = "Nuevo APU";
+    setEstado("Sin guardar");
+  }
+
+  function abrirAPU(id) {
+    document.getElementById("v-lista").style.display = "none";
+    document.getElementById("v-apu").style.display   = "";
+    setEstado("Cargando...");
+    google.script.run
+      .withSuccessHandler(apu => {
+        apuActual = apu;
+        filas     = { EQUIPO: {}, MATERIAL: {}, MANO_OBRA: {}, OTRO: {} };
+        renderFormulario(apu);
+        setEstado("Guardado ✓");
+      })
+      .withFailureHandler(err => setEstado("Error: " + err.message))
+      .getAPUCompleto(id);
+  }
+
+  function renderFormulario(apu) {
+    document.getElementById("apu-titulo").textContent  = "APU — " + (apu.cliente || apu.codigo_item || "#" + apu.id);
+    document.getElementById("f-cliente").value   = apu.cliente      || "";
+    document.getElementById("f-actividad").value = apu.actividad    || "";
+    document.getElementById("f-item").value      = apu.codigo_item  || "";
+    document.getElementById("f-unidad").value    = apu.unidad       || "";
+
+    ["body-equipos","body-materiales","body-mano-obra","body-otros"]
+      .forEach(id => document.getElementById(id).innerHTML = "");
+
+    (apu.equipos    || []).forEach(i => renderFila("EQUIPO",    i));
+    (apu.materiales || []).forEach(i => renderFila("MATERIAL",  i));
+    (apu.mano_obra  || []).forEach(i => renderFila("MANO_OBRA", i));
+    (apu.otros      || []).forEach(i => renderFila("OTRO",      i));
+    recalcularTotalesUI();
+  }
+
+  function limpiarFormulario() {
+    ["f-cliente","f-actividad","f-item","f-unidad"].forEach(id =>
+      document.getElementById(id).value = "");
+    ["body-equipos","body-materiales","body-mano-obra","body-otros"].forEach(id =>
+      document.getElementById(id).innerHTML = "");
+    ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros",
+     "costo-directo","val-admin","val-imprevistos","val-utilidad","total-final"]
+      .forEach(id => document.getElementById(id).textContent = COP(0));
+  }
+
+  // ═══ GUARDAR CABEZA ═══════════════════════════════════════════════════════
+  function guardarCabeza() {
+    const datos = {
+      codigo_item: document.getElementById("f-item").value,
+      descripcion: document.getElementById("f-item").value,
+      unidad:      document.getElementById("f-unidad").value,
+      cliente:     document.getElementById("f-cliente").value,
+      actividad:   document.getElementById("f-actividad").value,
+    };
+    if (!apuActual) {
+      setEstado("Guardando...");
+      google.script.run
+        .withSuccessHandler(id => {
+          apuActual = { id };
+          setEstado("Guardado ✓");
+          document.getElementById("apu-titulo").textContent = "APU — " + (datos.cliente || "#" + id);
+        })
+        .withFailureHandler(err => setEstado("Error guardando"))
+        .crearAPU(datos);
+    } else {
+      google.script.run
+        .withSuccessHandler(() => setEstado("Guardado ✓"))
+        .actualizarCabezaAPU(apuActual.id, datos);
+    }
+  }
+
+  // ═══ RENDERIZAR FILA ══════════════════════════════════════════════════════
+  function renderFila(tipo, item) {
+    const bodyIds = {
+      EQUIPO:    "body-equipos",
+      MATERIAL:  "body-materiales",
+      MANO_OBRA: "body-mano-obra",
+      OTRO:      "body-otros",
+    };
+    const tbody = document.getElementById(bodyIds[tipo]);
+    const id    = item.id;
+    const cant  = parseFloat(item.cantidad)        || 0;
+    const precio= parseFloat(item.precio_unitario) || 0;
+    const rend  = parseFloat(item.rendimiento)     || 1;
+    const vp    = parseFloat(item.valor_parcial)   || calcVP(tipo, cant, precio, rend);
+
+    filas[tipo][id] = { cant, precio, rend, vp };
+
+    // Intentar encontrar la unidad del material en la BD local
+    const unidad = item.unidad
+      || (tipo === "MATERIAL" && bd.materiales.find(m => m.id == item.recurso_id)?.unidad)
+      || "";
+
+    let html = "";
+    if (tipo === "EQUIPO") {
+      html = `<tr id="row-${id}">
+        <td>${item.descripcion_manual || ""}</td>
+        <td><input type="number" class="cell-input" value="${cant}" min="0"
+            onchange="cambiar(${id},'EQUIPO','cant',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${precio}" min="0"
+            onchange="cambiar(${id},'EQUIPO','precio',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${rend}" min="0.001" step="0.01"
+            onchange="cambiar(${id},'EQUIPO','rend',this.value)"></td>
+        <td class="num vp" id="vp-${id}">${COP(vp)}</td>
+        <td><button class="btn-del" onclick="eliminarFila(${id},'EQUIPO')">✕</button></td>
+      </tr>`;
+
+    } else if (tipo === "MATERIAL") {
+      html = `<tr id="row-${id}">
+        <td>${item.descripcion_manual || ""}</td>
+        <td>${unidad}</td>
+        <td><input type="number" class="cell-input" value="${precio}" min="0"
+            onchange="cambiar(${id},'MATERIAL','precio',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${cant}" min="0"
+            onchange="cambiar(${id},'MATERIAL','cant',this.value)"></td>
+        <td class="num vp" id="vp-${id}">${COP(vp)}</td>
+        <td><button class="btn-del" onclick="eliminarFila(${id},'MATERIAL')">✕</button></td>
+      </tr>`;
+
+    } else if (tipo === "MANO_OBRA") {
+      html = `<tr id="row-${id}">
+        <td>${item.descripcion_manual || ""}</td>
+        <td><input type="number" class="cell-input" value="${cant}" min="0"
+            onchange="cambiar(${id},'MANO_OBRA','cant',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${precio}" min="0"
+            onchange="cambiar(${id},'MANO_OBRA','precio',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${rend}" min="0.001" step="0.01"
+            onchange="cambiar(${id},'MANO_OBRA','rend',this.value)"></td>
+        <td class="num vp" id="vp-${id}">${COP(vp)}</td>
+        <td><button class="btn-del" onclick="eliminarFila(${id},'MANO_OBRA')">✕</button></td>
+      </tr>`;
+
+    } else if (tipo === "OTRO") {
+      html = `<tr id="row-${id}">
+        <td><input type="text" class="cell-input desc-input" value="${item.descripcion_manual || ""}"
+            placeholder="Ej: Transporte, izaje..."
+            onchange="cambiarDesc(${id},'OTRO',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${precio}" min="0"
+            placeholder="Valor total" onchange="cambiar(${id},'OTRO','precio',this.value)"></td>
+        <td><input type="number" class="cell-input" value="${cant || 1}" min="1"
+            placeholder="# unidades" onchange="cambiar(${id},'OTRO','cant',this.value)"></td>
+        <td class="num vp" id="vp-${id}">${COP(vp)}</td>
+        <td><button class="btn-del" onclick="eliminarFila(${id},'OTRO')">✕</button></td>
+      </tr>`;
+    }
+    tbody.insertAdjacentHTML("beforeend", html);
+  }
+
+  // ═══ CAMBIOS EN CELDAS ════════════════════════════════════════════════════
+  function cambiar(id, tipo, campo, val) {
+    const f = filas[tipo][id];
+    if (!f) return;
+    f[campo] = parseFloat(val) || (campo === "rend" ? 1 : 0);
+    f.vp     = calcVP(tipo, f.cant, f.precio, f.rend);
+    document.getElementById("vp-" + id).textContent = COP(f.vp);
+    recalcularTotalesUI();
+
+    clearTimeout(window["save_" + id]);
+    window["save_" + id] = setTimeout(() => {
+      google.script.run.actualizarItemAPU(id, {
+        cantidad:        f.cant,
+        precio_unitario: f.precio,
+        rendimiento:     f.rend,
+      });
+    }, 800);
+  }
+
+  function cambiarDesc(id, tipo, val) {
+    clearTimeout(window["desc_" + id]);
+    window["desc_" + id] = setTimeout(() => {
+      google.script.run.actualizarItemAPU(id, { descripcion_manual: val });
+    }, 800);
+  }
+
+  // ═══ CÁLCULOS ═════════════════════════════════════════════════════════════
+  function calcVP(tipo, cant, precio, rend) {
+    if (tipo === "EQUIPO"   || tipo === "MANO_OBRA") return rend > 0 ? (cant * precio) / rend : 0;
+    if (tipo === "MATERIAL")                          return cant * precio;
+    if (tipo === "OTRO")                              return cant > 0 ? precio / cant : 0;
+    return 0;
+  }
+
+  function recalcularTotalesUI() {
+    const suma = tipo => Object.values(filas[tipo]).reduce((a, f) => a + (f.vp || 0), 0);
+    const subEq  = suma("EQUIPO");
+    const subMat = suma("MATERIAL");
+    const subMo  = suma("MANO_OBRA");
+    const subOt  = suma("OTRO");
+    const neto   = subEq + subMat + subMo + subOt;
+
+    document.getElementById("sub-equipos").textContent    = COP(subEq);
+    document.getElementById("sub-materiales").textContent = COP(subMat);
+    document.getElementById("sub-mano-obra").textContent  = COP(subMo);
+    document.getElementById("sub-otros").textContent      = COP(subOt);
+    document.getElementById("costo-directo").textContent  = COP(neto);
+
+    const pA = parseFloat(document.getElementById("pct-admin").value)      || 0;
+    const pI = parseFloat(document.getElementById("pct-imprevistos").value) || 0;
+    const pU = parseFloat(document.getElementById("pct-utilidad").value)    || 0;
+
+    const vA = neto * pA / 100;
+    const vI = neto * pI / 100;
+    const vU = neto * pU / 100;
+
+    document.getElementById("val-admin").textContent       = COP(vA);
+    document.getElementById("val-imprevistos").textContent = COP(vI);
+    document.getElementById("val-utilidad").textContent    = COP(vU);
+    document.getElementById("total-final").textContent     = COP(neto + vA + vI + vU);
+  }
+
+  // ═══ ELIMINAR FILA ════════════════════════════════════════════════════════
+  function eliminarFila(id, tipo) {
+    if (!confirm("¿Eliminar este ítem?")) return;
+    document.getElementById("row-" + id)?.remove();
+    delete filas[tipo][id];
+    recalcularTotalesUI();
+    google.script.run.eliminarItemAPU(id);
+  }
+
+  // ═══ AGREGAR OTROS (manual, sin BD) ══════════════════════════════════════
+  function agregarOtro() {
+    if (!asegurarAPU()) return;
+    const tempId = "t" + Date.now();
+    const item   = { id: tempId, tipo: "OTRO", descripcion_manual: "", precio_unitario: 0, cantidad: 1, rendimiento: 1, valor_parcial: 0 };
+    filas["OTRO"][tempId] = { cant: 1, precio: 0, rend: 1, vp: 0 };
+    renderFila("OTRO", item);
+
+    google.script.run
+      .withSuccessHandler(res => reemplazarTempId(tempId, res.id, "OTRO"))
+      .agregarItemAPU(apuActual.id, { tipo: "OTRO", descripcion_manual: "", precio_unitario: 0, cantidad: 1, rendimiento: 1 });
+  }
+
+  // ═══ MODAL DE BÚSQUEDA ════════════════════════════════════════════════════
+  function abrirBusqueda(tipo) {
+    if (!asegurarAPU()) return;
+    tipoModal = tipo;
+    document.getElementById("m-query").value = "";
+
+    const titulos = { EQUIPO: "Agregar Equipo", MATERIAL: "Agregar Material", MANO_OBRA: "Agregar Mano de Obra" };
+    document.getElementById("modal-titulo").textContent = titulos[tipo];
+
+    const catSel = document.getElementById("m-cat");
+    if (tipo === "MATERIAL") {
+      catSel.style.display = "";
+      catSel.innerHTML = '<option value="">Todas las categorías</option>';
+      const cats = [...new Set(bd.materiales.map(m => m.categoria).filter(Boolean))].sort();
+      cats.forEach(c => catSel.innerHTML += `<option>${c}</option>`);
+    } else {
+      catSel.style.display = "none";
+    }
+
+    renderHeaderModal(tipo);
+    filtrarModal();
+    document.getElementById("modal").style.display = "flex";
+    setTimeout(() => document.getElementById("m-query").focus(), 80);
+  }
+
+  function renderHeaderModal(tipo) {
+    const cols = {
+      EQUIPO:    ["NOMBRE", "TARIFA/DÍA", ""],
+      MATERIAL:  ["COD.", "CATEGORÍA", "NOMBRE", "UND.", "PRECIO SIN IVA", ""],
+      MANO_OBRA: ["DESCRIPCIÓN", "SALARIO MENSUAL", "COSTO/DÍA", ""],
+    };
+    document.getElementById("modal-thead").innerHTML =
+      "<tr>" + (cols[tipo] || []).map(h => `<th>${h}</th>`).join("") + "</tr>";
+  }
+
+  function filtrarModal() {
+    const q   = document.getElementById("m-query").value.toLowerCase().trim();
+    const cat = document.getElementById("m-cat").value;
+    let res   = [];
+
+    if (tipoModal === "MATERIAL") {
+      res = bd.materiales.filter(m =>
+        (!q   || (m.nombre || "").toLowerCase().includes(q)) &&
+        (!cat || m.categoria === cat)
+      );
+    } else if (tipoModal === "EQUIPO") {
+      res = bd.equipos.filter(e => !q || (e.nombre || "").toLowerCase().includes(q));
+    } else if (tipoModal === "MANO_OBRA") {
+      res = bd.manoObra.filter(m => !q || (m.descripcion || "").toLowerCase().includes(q));
+    }
+
+    renderResultadosModal(res.slice(0, 60));
+  }
+
+  function renderResultadosModal(items) {
+    const tbody = document.getElementById("modal-tbody");
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Sin resultados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(item => {
+      const id = item.id;
+      if (tipoModal === "MATERIAL") {
+        return `<tr>
+          <td class="mono">${item.codigo || "—"}</td>
+          <td><span class="badge">${item.categoria || ""}</span></td>
+          <td>${item.nombre}</td>
+          <td>${item.unidad}</td>
+          <td class="num">
+            ${COP(item.precio_sin_iva)}
+            <button class="btn-edit-p" data-id="${id}" data-tipo="MATERIAL" title="Editar precio">✏</button>
+          </td>
+          <td><button class="btn-sel" data-id="${id}" data-tipo="MATERIAL">Agregar</button></td>
+        </tr>`;
+      } else if (tipoModal === "EQUIPO") {
+        return `<tr>
+          <td>${item.nombre}</td>
+          <td class="num">
+            ${COP(item.tarifa_dia)}
+            <button class="btn-edit-p" data-id="${id}" data-tipo="EQUIPO" title="Editar tarifa">✏</button>
+          </td>
+          <td><button class="btn-sel" data-id="${id}" data-tipo="EQUIPO">Agregar</button></td>
+        </tr>`;
+      } else if (tipoModal === "MANO_OBRA") {
+        return `<tr>
+          <td>${item.descripcion}</td>
+          <td class="num">
+            ${COP(item.salario_mensual)}
+            <button class="btn-edit-p" data-id="${id}" data-tipo="MANO_OBRA" title="Editar salario">✏</button>
+          </td>
+          <td class="num">${COP(item.costo_dia)}</td>
+          <td><button class="btn-sel" data-id="${id}" data-tipo="MANO_OBRA">Agregar</button></td>
+        </tr>`;
       }
-    </script>
-  </body>
+    }).join("");
+  }
+
+  // Delegación de eventos en el modal (evita JSON en atributos onclick)
+  document.getElementById("modal-tbody").addEventListener("click", e => {
+    const selBtn  = e.target.closest(".btn-sel");
+    const editBtn = e.target.closest(".btn-edit-p");
+    if (selBtn)  seleccionarRecurso(selBtn.dataset.id, selBtn.dataset.tipo);
+    if (editBtn) editarPrecio(editBtn.dataset.id, editBtn.dataset.tipo);
+  });
+
+  function seleccionarRecurso(id, tipo) {
+    let recurso;
+    if (tipo === "MATERIAL") {
+      const m = bd.materiales.find(x => x.id == id);
+      recurso = { id, nombre: m.nombre, unidad: m.unidad, precio: m.precio_sin_iva };
+    } else if (tipo === "EQUIPO") {
+      const e = bd.equipos.find(x => x.id == id);
+      recurso = { id, nombre: e.nombre, precio: e.tarifa_dia };
+    } else if (tipo === "MANO_OBRA") {
+      const m = bd.manoObra.find(x => x.id == id);
+      recurso = { id, nombre: m.descripcion, precio: m.costo_dia };
+    }
+    cerrarModal();
+
+    const tempId = "t" + Date.now();
+    const item   = {
+      id:                 tempId,
+      tipo:               tipoModal,
+      recurso_id:         recurso.id,
+      descripcion_manual: recurso.nombre,
+      unidad:             recurso.unidad || "",
+      precio_unitario:    recurso.precio,
+      cantidad:           1,
+      rendimiento:        1,
+      valor_parcial:      calcVP(tipoModal, 1, recurso.precio, 1),
+    };
+    filas[tipoModal][tempId] = { cant: 1, precio: recurso.precio, rend: 1, vp: item.valor_parcial };
+    renderFila(tipoModal, item);
+    recalcularTotalesUI();
+
+    google.script.run
+      .withSuccessHandler(res => reemplazarTempId(tempId, res.id, tipoModal))
+      .withFailureHandler(err => alert("Error guardando ítem: " + err.message))
+      .agregarItemAPU(apuActual.id, {
+        tipo:               tipoModal,
+        recurso_id:         recurso.id,
+        descripcion_manual: recurso.nombre,
+        precio_unitario:    recurso.precio,
+        cantidad:           1,
+        rendimiento:        1,
+      });
+  }
+
+  function editarPrecio(id, tipo) {
+    let recurso, actual, campo;
+    if (tipo === "MATERIAL") {
+      recurso = bd.materiales.find(x => x.id == id);
+      actual  = recurso.precio_sin_iva;
+      campo   = "precio_sin_iva";
+    } else if (tipo === "EQUIPO") {
+      recurso = bd.equipos.find(x => x.id == id);
+      actual  = recurso.tarifa_dia;
+      campo   = "tarifa_dia";
+    } else if (tipo === "MANO_OBRA") {
+      recurso = bd.manoObra.find(x => x.id == id);
+      actual  = recurso.salario_mensual;
+      campo   = "salario_mensual";
+    }
+    const nuevo = prompt(
+      `Actualizar "${recurso.nombre || recurso.descripcion}"\nPrecio actual: ${COP(actual)}`,
+      actual
+    );
+    if (nuevo === null || isNaN(parseFloat(nuevo))) return;
+    const nuevoPrecio = parseFloat(nuevo);
+
+    // Actualizar caché local
+    recurso[campo] = nuevoPrecio;
+    if (tipo === "MANO_OBRA") recurso.costo_dia = Math.round(nuevoPrecio * 1.54 / 30);
+
+    google.script.run
+      .withSuccessHandler(() => filtrarModal())
+      .actualizarPrecioRecurso(tipo, id, nuevoPrecio);
+  }
+
+  // ═══ HELPERS ══════════════════════════════════════════════════════════════
+  function reemplazarTempId(tempId, realId, tipo) {
+    const row = document.getElementById("row-" + tempId);
+    if (row) {
+      row.id = "row-" + realId;
+      row.querySelectorAll("[onchange],[onclick]").forEach(el => {
+        ["onchange","onclick"].forEach(attr => {
+          const v = el.getAttribute(attr);
+          if (v) el.setAttribute(attr, v.replace(new RegExp(tempId, "g"), realId));
+        });
+      });
+      const vpEl = document.getElementById("vp-" + tempId);
+      if (vpEl) vpEl.id = "vp-" + realId;
+    }
+    filas[tipo][realId] = filas[tipo][tempId];
+    delete filas[tipo][tempId];
+  }
+
+  function asegurarAPU() {
+    if (apuActual) return true;
+    const cliente = document.getElementById("f-cliente").value;
+    if (!cliente) {
+      alert("Completa primero el campo OBRA / CLIENTE y presiona Tab para guardar.");
+      document.getElementById("f-cliente").focus();
+      return false;
+    }
+    guardarCabeza();
+    alert("APU iniciado. Ahora puedes agregar ítems.");
+    return false; // user needs to try again after save
+  }
+
+  function cerrarModal()     { document.getElementById("modal").style.display = "none"; }
+  function cerrarModalFuera(e) { if (e.target.id === "modal") cerrarModal(); }
+  function setEstado(msg)    { document.getElementById("apu-estado").textContent = msg; }
+
+  window.onload = init;
+</script>
+</body>
 </html>
