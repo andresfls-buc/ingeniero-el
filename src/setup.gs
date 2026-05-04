@@ -46,7 +46,13 @@ function setupDatabase() {
   ]);
 
   seedMateriales(ss);
+  SpreadsheetApp.flush();
   seedManoObra(ss);
+  seedEquipos(ss);
+  SpreadsheetApp.flush();
 
-  SpreadsheetApp.getUi().alert("Base de datos creada y datos cargados correctamente.");
+  SpreadsheetApp.getUi().alert(
+    "✅ Base de datos creada y datos cargados.\n\n" +
+    "Ahora corre la función «formatearHojas» para aplicar el formato visual."
+  );
 }

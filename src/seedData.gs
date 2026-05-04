@@ -196,28 +196,49 @@ function seedMateriales(ss) {
     ["", "Tub PE-AL-PE Gas", "TUB 2025 PE-AL-PE GAS", "MT", 4047, null, ""],
   ];
 
-  data.forEach((m, i) => {
+  const rows = data.map((m, i) => {
     const [codigo, categoria, nombre, unidad, precio_sin_iva, precio_con_iva, precio_2026] = m;
-    const conIva = precio_con_iva !== null
-      ? precio_con_iva
-      : Math.round(precio_sin_iva * 1.19);
-    sheet.appendRow([
-      i + 1,
-      codigo,
-      categoria,
-      nombre,
-      unidad,
-      precio_sin_iva,
-      conIva,
-      precio_2026 !== "" ? precio_2026 : "",
-      proveedor,
-      fecha
-    ]);
+    const conIva = precio_con_iva !== null ? precio_con_iva : Math.round(precio_sin_iva * 1.19);
+    return [i + 1, codigo, categoria, nombre, unidad, precio_sin_iva, conIva, precio_2026 !== "" ? precio_2026 : "", proveedor, fecha];
   });
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
 
 // Carga los roles de mano de obra con cálculo automático de costo/día
 // según ley colombiana: salario_integral = salario * (1 + prestaciones%) / 30
+function seedEquipos(ss) {
+  const sheet = ss.getSheetByName("Equipos");
+  const equipos = [
+    ["Antorcha Oxiacetilénica",               80000],
+    ["Soldador de Arco Eléctrico",            60000],
+    ["Dobladora de Tubería Manual",           15000],
+    ["Dobladora de Tubería Hidráulica",       45000],
+    ["Cortadora de Tubería",                   8000],
+    ["Roscadora Eléctrica 1/2\" a 2\"",       80000],
+    ["Taladro Percutor 1/2\"",                20000],
+    ["Amoladora / Esmeriladora 4\"",          25000],
+    ["Compresor de Aire 50 L",               100000],
+    ["Bomba de Vacío 2 etapas",               60000],
+    ["Manómetro Manifold (recarga gas)",      15000],
+    ["Andamio Tubular (módulo 1.5 m)",        15000],
+    ["Escalera Metálica 6 m",                 12000],
+    ["Equipo de Soldadura TIG",              120000],
+    ["Llave de Cadena 36\"",                   8000],
+    ["Llave Stilson 18\"",                     5000],
+    ["Detector de Fugas de Gas",              20000],
+    ["Prensaflex / Prensa Hidráulica",       150000],
+    ["Máquina de Soldar MIG/MAG",            100000],
+    ["Rotomartillo SDS Plus",                 30000],
+    ["Sierra Eléctrica para Metal",           40000],
+    ["Nivel Láser",                           25000],
+    ["Generador Eléctrico 5 kVA",             80000],
+    ["Fluxómetro (medidor de caudal)",        35000],
+    ["Cámara Termográfica",                  120000],
+  ];
+  const rows = equipos.map((e, i) => [i + 1, e[0], e[1]]);
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+}
+
 function seedManoObra(ss) {
   const sheet = ss.getSheetByName("ManoObra");
   const PREST_PCT = 54; // 54% cubre seguridad social, ARL, primas, dotación
@@ -232,9 +253,10 @@ function seedManoObra(ss) {
     ["Ingeniero",             4000000],
   ];
 
-  trabajadores.forEach((t, i) => {
+  const rows = trabajadores.map((t, i) => {
     const [descripcion, salario] = t;
     const costo_dia = Math.round(salario * (1 + PREST_PCT / 100) / 30);
-    sheet.appendRow([i + 1, descripcion, salario, PREST_PCT, costo_dia]);
+    return [i + 1, descripcion, salario, PREST_PCT, costo_dia];
   });
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
