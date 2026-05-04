@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <base target="_top" />
+  </head>
+  <body>
+    <h2>Sistema APU</h2>
+
+    <button onclick="initDB()">Crear Base de Datos</button>
+
+    <script>
+      function initDB() {
+        google.script.run
+          .withSuccessHandler(() => alert("DB creada"))
+          .setupDatabase();
+      }
+    </script>
+  </body>
+</html>
