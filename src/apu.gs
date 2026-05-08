@@ -1,18 +1,78 @@
-// ─── CARGA DE BD (para búsqueda client-side) ─────────────────────────────────
+// ─── DIAGNÓSTICO ──────────────────────────────────────────────────────────────
 
-function cargarTodosBD() {
+function diagnosticarBD() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { error: "getActiveSpreadsheet() retornó null — el script no está vinculado a ningún spreadsheet." };
+  const hojas        = ss.getSheets().map(s => s.getName());
+  const equiposSheet = ss.getSheetByName("Equipos");
+  const equiposFilas = equiposSheet ? equiposSheet.getLastRow() : -1;
+  const equiposCols  = equiposSheet ? equiposSheet.getLastColumn() : -1;
+  const equiposParsed = equiposSheet ? sheetToObjects(ss, "Equipos").length : -1;
   return {
-    materiales: sheetToObjects(ss, "Materiales"),
-    manoObra:   sheetToObjects(ss, "ManoObra"),
-    equipos:    sheetToObjects(ss, "Equipos"),
+    spreadsheetNombre: ss.getName(),
+    spreadsheetId:     ss.getId(),
+    hojas:             hojas,
+    equiposFilas:      equiposFilas,
+    equiposCols:       equiposCols,
+    equiposParsed:     equiposParsed,
   };
+}
+
+// ─── CARGA DE BD (por tipo, para evitar límite de serialización) ──────────────
+
+function cargarEquipos() {
+  return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Equipos");
+}
+
+function cargarMateriales() {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  return items.map(m => ({
+    id:             m.id,
+    codigo:         m.codigo,
+    categoria:      m.categoria,
+    nombre:         m.nombre,
+    unidad:         m.unidad,
+    precio_sin_iva: m.precio_sin_iva,
+  }));
+}
+
+function cargarManoObra() {
+  return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "ManoObra");
+}
+
+function cargarCategoriasMateriales() {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  const cats = [...new Set(items.map(m => String(m.categoria || "")).filter(Boolean))].sort();
+  return cats;
+}
+
+function buscarMateriales(query, categoria) {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  const q   = String(query    || "").toLowerCase().trim();
+  const cat = String(categoria || "").trim();
+  return items.filter(m => {
+    const matchCat = !cat || m.categoria === cat;
+    const matchQ   = !q
+      || String(m.nombre  || "").toLowerCase().includes(q)
+      || String(m.codigo  || "").toLowerCase().includes(q);
+    return matchCat && matchQ;
+  }).slice(0, 50);
 }
 
 // ─── LISTA DE APUs ────────────────────────────────────────────────────────────
 
 function listarAPUs() {
-  return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
+  return items.map(a => ({
+    id:          a.id,
+    codigo_item: a.codigo_item,
+    descripcion: a.descripcion,
+    unidad:      a.unidad,
+    cliente:     a.cliente,
+    actividad:   a.actividad,
+    costo_neto:  a.costo_neto,
+    fecha:       String(a.fecha || ""),
+  }));
 }
 
 // ─── CREAR APU ────────────────────────────────────────────────────────────────
@@ -75,10 +135,13 @@ function getAPUCompleto(apuId) {
   if (!apuRow) return null;
 
   const apu = {};
-  apuHeaders.forEach((h, i) => apu[h] = apuRow[i]);
+  apuHeaders.forEach((h, i) => {
+    const v = apuRow[i];
+    apu[h] = (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy") : v;
+  });
 
-  const itemsSheet   = ss.getSheetByName("APU_Items");
-  const itemsData    = itemsSheet.getDataRange().getValues();
+  const itemsSheet = ss.getSheetByName("APU_Items");
+  const itemsData  = itemsSheet.getDataRange().getValues();
   if (itemsData.length < 2) {
     apu.equipos = []; apu.materiales = []; apu.mano_obra = []; apu.otros = [];
     return apu;
@@ -87,7 +150,14 @@ function getAPUCompleto(apuId) {
   const ih    = itemsData[0];
   const items = itemsData.slice(1)
     .filter(r => r[ih.indexOf("apu_id")] == apuId)
-    .map(r => { const o = {}; ih.forEach((h, i) => o[h] = r[i]); return o; });
+    .map(r => {
+      const o = {};
+      ih.forEach((h, i) => {
+        const v = r[i];
+        o[h] = (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy") : v;
+      });
+      return o;
+    });
 
   apu.equipos    = items.filter(i => i.tipo === "EQUIPO");
   apu.materiales = items.filter(i => i.tipo === "MATERIAL");
@@ -255,12 +325,14 @@ function recalcularSubtotales(ss, apuId) {
 function sheetToObjects(ss, name) {
   const sheet = ss.getSheetByName(name);
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-  const headers = data[0];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  const data    = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = data[0].map(h => String(h).trim());
   return data.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => { if (h) obj[h] = row[i]; });
     return obj;
   });
 }
