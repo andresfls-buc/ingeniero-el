@@ -45,6 +45,17 @@ function setupDatabase() {
     "unidad", "cantidad", "precio_apu", "valor_total"
   ]);
 
+  // === CONFIGURACIÓN ===
+  createSheet(ss, "Configuracion", ["clave", "valor", "descripcion"]);
+  const cfg = ss.getSheetByName("Configuracion");
+  cfg.appendRow(["carpeta_cotizaciones", "", "ID de la carpeta de Drive donde se guardan los PDFs de cotizaciones"]);
+  cfg.appendRow(["carpeta_apus",         "", "ID de la carpeta de Drive donde se guardarán los PDFs de APUs"]);
+  // Formato de la hoja config
+  cfg.setColumnWidth(1, 180);
+  cfg.setColumnWidth(2, 340);
+  cfg.setColumnWidth(3, 420);
+  cfg.getRange(2, 3, 2, 1).setFontColor("#9e9e9e").setFontStyle("italic");
+
   seedMateriales(ss);
   SpreadsheetApp.flush();
   seedManoObra(ss);

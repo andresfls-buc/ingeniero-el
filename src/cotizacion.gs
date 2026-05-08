@@ -44,8 +44,12 @@ function exportarCotizacionPDF(cotId) {
 }
 
 function obtenerCarpetaPDF() {
-  const FOLDER_ID = "1R79tytVR757WYntnQQUb5WpROq_nSwDP";
-  const raiz      = DriveApp.getFolderById(FOLDER_ID);
+  const FOLDER_ID = (getConfig()["carpeta_cotizaciones"] || "").trim();
+  if (!FOLDER_ID) throw new Error(
+    "Configura el ID de tu carpeta de Drive en la hoja 'Configuracion' → fila 'carpeta_cotizaciones'. " +
+    "Abre la carpeta en Drive, copia el ID del final de la URL y pégalo ahí."
+  );
+  const raiz = DriveApp.getFolderById(FOLDER_ID);
 
   const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];

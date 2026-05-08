@@ -333,6 +333,7 @@
     <h2 id="apu-titulo">Nuevo APU</h2>
     <span class="estado-tag" id="apu-estado"></span>
     <button class="btn btn-primary" onclick="guardarAPUManual()" style="margin-left:auto">Guardar APU</button>
+    <button class="btn btn-primary" onclick="crearCotizacionDesdeAPU()" style="background:#2e7d32;color:#fff">Crear Cotización →</button>
   </div>
 
   <div class="container">
@@ -457,17 +458,17 @@
         </div>
         <div class="total-row">
           <span class="label">Administración</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-admin" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-admin" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
           <span class="total-val" id="val-admin">$ 0</span>
         </div>
         <div class="total-row">
           <span class="label">Imprevistos</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-imprevistos" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-imprevistos" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
           <span class="total-val" id="val-imprevistos">$ 0</span>
         </div>
         <div class="total-row">
           <span class="label">Utilidad</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-utilidad" type="number" value="0" min="0" max="100" onchange="recalcularTotales()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="pct-utilidad" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
           <span class="total-val" id="val-utilidad">$ 0</span>
         </div>
         <div class="total-row final">
@@ -632,16 +633,7 @@
 
   // ═══ INICIALIZACIÓN ═══════════════════════════════════════════════════════
   function init() {
-    google.script.run
-      .withSuccessHandler(data => {
-        bd = data || { materiales: [], manoObra: [], equipos: [] };
-        mostrarLista();
-      })
-      .withFailureHandler(err => {
-        console.error("cargarTodosBD falló:", err.message);
-        mostrarLista();
-      })
-      .cargarTodosBD();
+    mostrarLista();
   }
 
   // ═══ VISTA: LISTA ════════════════════════════════════════════════════════
@@ -695,7 +687,8 @@
     setEstado("Cargando...");
     google.script.run
       .withSuccessHandler(apu => {
-        apuActual = apu;
+        if (!apu) { setEstado("Error: APU no encontrado"); return; }
+        apuActual = apu.id;
         filas     = { EQUIPO: {}, MATERIAL: {}, MANO_OBRA: {}, OTRO: {} };
         renderFormulario(apu);
         setEstado("Guardado ✓");
@@ -749,6 +742,46 @@
 
   function guardarAPUManual() {
     asegurarAPUluego(() => guardarCabeza());
+  }
+
+  function crearCotizacionDesdeAPU() {
+    if (!apuActual) {
+      alert("Guarda el APU primero antes de crear una cotización.");
+      return;
+    }
+    setEstado("Guardando...");
+    guardarCabeza();
+
+    const cliente = document.getElementById("f-cliente").value || "";
+    const datos   = { cliente, administracion_pct: 0, imprevistos_pct: 0, utilidad_pct: 0 };
+
+    google.script.run
+      .withSuccessHandler(res => {
+        const cotId = res.id;
+        google.script.run
+          .withSuccessHandler(() => {
+            google.script.run
+              .withSuccessHandler(cot => {
+                tabActual = "cots";
+                document.getElementById("tab-cots").classList.add("active");
+                document.getElementById("tab-apus").classList.remove("active");
+                document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
+                document.getElementById("v-apu").style.display  = "none";
+                document.getElementById("v-lista").style.display = "none";
+                document.getElementById("v-cot").style.display   = "";
+                cotActual = cot;
+                cotItems  = {};
+                renderCotizacion(cot);
+                setCotEstado("Guardado ✓");
+              })
+              .withFailureHandler(err => alert("Error cargando cotización: " + err.message))
+              .getCotizacionCompleta(cotId);
+          })
+          .withFailureHandler(err => alert("Error agregando APU: " + err.message))
+          .agregarAPUaCotizacion(cotId, apuActual, 1);
+      })
+      .withFailureHandler(err => alert("Error creando cotización: " + err.message))
+      .crearCotizacion(datos);
   }
 
   // ═══ RENDERIZAR FILA ══════════════════════════════════════════════════════
@@ -923,18 +956,35 @@
     const titulos = { EQUIPO: "Agregar Equipo", MATERIAL: "Agregar Material", MANO_OBRA: "Agregar Mano de Obra" };
     document.getElementById("modal-titulo").textContent = titulos[tipo];
     const catSel = document.getElementById("m-cat");
-    if (tipo === "MATERIAL") {
-      catSel.style.display = "";
-      catSel.innerHTML = '<option value="">Todas las categorías</option>';
-      const cats = [...new Set(bd.materiales.map(m => m.categoria).filter(Boolean))].sort();
-      cats.forEach(c => catSel.innerHTML += `<option>${c}</option>`);
-    } else {
-      catSel.style.display = "none";
-    }
+    catSel.style.display = tipo === "MATERIAL" ? "" : "none";
     renderHeaderModal(tipo);
-    filtrarModal();
+
+    // Mostrar modal con loading y cargar siempre desde el servidor
+    document.getElementById("modal-tbody").innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:30px;color:#888">Cargando...</td></tr>';
     document.getElementById("modal").style.display = "flex";
     setTimeout(() => document.getElementById("m-query").focus(), 80);
+
+    const bdKey    = { EQUIPO: 'equipos', MATERIAL: 'materiales', MANO_OBRA: 'manoObra' }[tipo];
+    const fnNombre = { EQUIPO: 'cargarEquipos', MATERIAL: 'cargarMateriales', MANO_OBRA: 'cargarManoObra' }[tipo];
+
+    google.script.run
+      .withSuccessHandler(data => {
+        bd[bdKey] = data || [];
+        if (tipo === "MATERIAL") {
+          catSel.innerHTML = '<option value="">Todas las categorías</option>';
+          const cats = [...new Set(bd.materiales.map(m => m.categoria).filter(Boolean))].sort();
+          cats.forEach(c => catSel.innerHTML += `<option>${c}</option>`);
+        }
+        filtrarModal();
+      })
+      .withFailureHandler(err => {
+        document.getElementById("modal-tbody").innerHTML =
+          `<tr><td colspan="8" style="text-align:center;padding:20px;color:#c62828">
+            Error cargando ${tipo}: ${err.message}
+          </td></tr>`;
+      })
+      [fnNombre]();
   }
 
   function renderHeaderModal(tipo) {
@@ -954,22 +1004,28 @@
 
     if (tipoModal === "MATERIAL") {
       res = (bd?.materiales || []).filter(m =>
-        (!q   || (m.nombre || "").toLowerCase().includes(q)) &&
+        (!q   || (m.nombre || "").toLowerCase().includes(q) || (m.codigo || "").toLowerCase().includes(q)) &&
         (!cat || m.categoria === cat)
       );
     } else if (tipoModal === "EQUIPO") {
-      res = (bd?.equipos || []).filter(e => !q || (e.nombre || "").toLowerCase().includes(q));
+      res = (bd?.equipos  || []).filter(e => !q || (e.nombre      || "").toLowerCase().includes(q));
     } else if (tipoModal === "MANO_OBRA") {
       res = (bd?.manoObra || []).filter(m => !q || (m.descripcion || "").toLowerCase().includes(q));
     }
-
-    renderResultadosModal(res.slice(0, 60));
+    renderResultadosModal(res);
   }
 
   function renderResultadosModal(items) {
     const tbody = document.getElementById("modal-tbody");
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">Sin resultados</td></tr>';
+      const bdKey = { EQUIPO: 'equipos', MATERIAL: 'materiales', MANO_OBRA: 'manoObra' }[tipoModal];
+      const total  = bdKey ? (bd[bdKey] || []).length : 0;
+      const q      = document.getElementById("m-query").value.trim();
+      const msg    = total === 0
+        ? `⚠ La tabla ${tipoModal} está vacía en Google Sheets (0 registros).<br>
+           <small>Ejecuta <strong>setupDatabase()</strong> desde el editor de Apps Script.</small>`
+        : `Sin resultados para "<strong>${q}</strong>" <small>(${total} registros en BD)</small>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">${msg}</td></tr>`;
       return;
     }
     tbody.innerHTML = items.map(item => {
@@ -1350,6 +1406,18 @@
   }
 
   function abrirSeleccionAPU() {
+    const _abrirModal = () => {
+      const tbody = document.getElementById("modal-apu-tbody");
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888">Cargando...</td></tr>';
+      document.getElementById("modal-apu").style.display = "flex";
+      google.script.run
+        .withSuccessHandler(apus => { todosLosAPUs = apus; renderModalAPUs(apus); })
+        .withFailureHandler(err => {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:#c62828">Error: ${err.message}</td></tr>`;
+        })
+        .listarAPUs();
+    };
+
     if (!cotActual) {
       const cliente = document.getElementById("cot-cliente").value;
       if (!cliente) {
@@ -1357,16 +1425,31 @@
         document.getElementById("cot-cliente").focus();
         return;
       }
-      guardarCabezaCot();
-      alert("Cotización iniciada. Ahora puedes agregar APUs.");
+      const datos = {
+        cliente,
+        direccion:          document.getElementById("cot-direccion").value,
+        notas:              document.getElementById("cot-notas").value,
+        administracion_pct: parseFloat(document.getElementById("cot-pct-admin").value)  || 0,
+        imprevistos_pct:    parseFloat(document.getElementById("cot-pct-imprev").value) || 0,
+        utilidad_pct:       parseFloat(document.getElementById("cot-pct-util").value)   || 0,
+      };
+      setCotEstado("Guardando...");
+      google.script.run
+        .withSuccessHandler(res => {
+          cotActual = { id: res.id, numero_oferta: res.numero_oferta };
+          document.getElementById("cot-titulo").textContent = res.numero_oferta;
+          setCotEstado("Guardado ✓");
+          _abrirModal();
+        })
+        .withFailureHandler(err => {
+          setCotEstado("Error guardando");
+          alert("Error guardando cotización: " + err.message);
+        })
+        .crearCotizacion(datos);
       return;
     }
-    const tbody = document.getElementById("modal-apu-tbody");
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888">Cargando...</td></tr>';
-    document.getElementById("modal-apu").style.display = "flex";
-    google.script.run
-      .withSuccessHandler(apus => { todosLosAPUs = apus; renderModalAPUs(apus); })
-      .listarAPUs();
+
+    _abrirModal();
   }
 
   function renderModalAPUs(apus) {
