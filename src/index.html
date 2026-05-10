@@ -300,7 +300,6 @@
 
     /* ── SECCIONES COTIZACIÓN ── */
     .sec-items .sec-header { background: #283593; }
-    .sec-aiu   .sec-header { background: #4527a0; }
   </style>
 </head>
 <body>
@@ -344,7 +343,11 @@
       <div class="form-grid">
         <div class="form-group">
           <label>OBRA / CLIENTE</label>
-          <input id="f-cliente" type="text" placeholder="Nombre del cliente o dirección" onblur="guardarCabeza()">
+          <input id="f-cliente" type="text" placeholder="Nombre del cliente" onblur="guardarCabeza()">
+        </div>
+        <div class="form-group">
+          <label>DIRECCIÓN</label>
+          <input id="f-direccion" type="text" placeholder="Dirección del proyecto" onblur="guardarCabeza()">
         </div>
         <div class="form-group">
           <label>ACTIVIDAD</label>
@@ -457,23 +460,28 @@
           <span class="total-val" id="costo-directo">$ 0</span>
         </div>
         <div class="total-row">
-          <span class="label">Administración</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-admin" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
-          <span class="total-val" id="val-admin">$ 0</span>
+          <span class="label">F — ADMINISTRACIÓN</span>
+          <span class="pct-wrap"><input class="pct-input" id="apu-adm-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
+          <span class="total-val" id="apu-adm-val">$ 0</span>
         </div>
         <div class="total-row">
-          <span class="label">Imprevistos</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-imprevistos" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
-          <span class="total-val" id="val-imprevistos">$ 0</span>
+          <span class="label">G — IMPREVISTOS</span>
+          <span class="pct-wrap"><input class="pct-input" id="apu-imp-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
+          <span class="total-val" id="apu-imp-val">$ 0</span>
         </div>
         <div class="total-row">
-          <span class="label">Utilidad</span>
-          <span class="pct-wrap"><input class="pct-input" id="pct-utilidad" type="number" value="0" min="0" max="100" oninput="recalcularTotalesUI()"> %</span>
-          <span class="total-val" id="val-utilidad">$ 0</span>
+          <span class="label">H — UTILIDAD</span>
+          <span class="pct-wrap"><input class="pct-input" id="apu-util-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
+          <span class="total-val" id="apu-util-val">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">I — IVA</span>
+          <span class="pct-wrap"><input class="pct-input" id="apu-iva-pct" type="number" min="0" max="100" step="0.5" value="19" onchange="guardarAIU()"> %</span>
+          <span class="total-val" id="apu-iva-val">$ 0</span>
         </div>
         <div class="total-row final">
-          <span class="label">TOTAL VALOR UNITARIO</span>
-          <span class="total-val" id="total-final">$ 0</span>
+          <span class="label">VALOR TOTAL &nbsp;<small style="color:#999">(E + F + G + H + I)</small></span>
+          <span class="total-val" id="apu-valor-total">$ 0</span>
         </div>
       </div>
     </div>
@@ -490,73 +498,89 @@
     <h2 id="cot-titulo">Nueva Cotización</h2>
     <span class="estado-tag" id="cot-estado"></span>
     <button class="btn btn-primary" id="btn-pdf" onclick="exportarPDF()" style="margin-left:auto">Exportar PDF</button>
+    <button class="btn btn-primary" id="btn-email" onclick="enviarPorCorreo()" style="background:#1565c0;color:#fff">Enviar →</button>
   </div>
   <div class="container">
 
-    <!-- DATOS GENERALES -->
-    <div class="card sec-general">
-      <div class="sec-header"><span>DATOS GENERALES</span></div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>CLIENTE / OBRA</label>
-          <input id="cot-cliente" type="text" placeholder="Nombre del cliente" onblur="guardarCabezaCot()">
-        </div>
-        <div class="form-group">
-          <label>DIRECCIÓN</label>
-          <input id="cot-direccion" type="text" placeholder="Dirección del proyecto" onblur="guardarCabezaCot()">
-        </div>
-        <div class="form-group">
-          <label>NOTAS</label>
-          <input id="cot-notas" type="text" placeholder="Observaciones..." onblur="guardarCabezaCot()">
-        </div>
-      </div>
-    </div>
-
-    <!-- ÍTEMS -->
+    <!-- APUs INCLUIDOS -->
     <div class="card sec-items">
       <div class="sec-header">
-        <span>ÍTEMS (APUs)</span>
+        <span>APUs INCLUIDOS</span>
         <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
       </div>
       <table class="apu-table">
         <thead>
           <tr>
-            <th style="width:40px">#</th>
-            <th>DESCRIPCIÓN</th>
-            <th style="width:70px">UNIDAD</th>
-            <th style="width:90px">CANTIDAD</th>
-            <th style="width:150px">PRECIO APU</th>
-            <th style="width:150px">VALOR TOTAL</th>
+            <th style="width:90px">CÓDIGO</th>
+            <th>DESCRIPCIÓN / ACTIVIDAD</th>
+            <th style="width:80px">UNIDAD</th>
+            <th style="width:140px">COSTO NETO</th>
             <th style="width:32px"></th>
           </tr>
         </thead>
         <tbody id="body-cot-items"></tbody>
       </table>
-      <div class="subtotal-row">COSTO NETO <span id="cot-valor-neto">$ 0</span></div>
     </div>
 
-    <!-- AIU -->
-    <div class="card sec-aiu">
-      <div class="sec-header"><span>AIU</span></div>
-      <div class="totales-body">
-        <div class="total-row">
-          <span class="label">Administración</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-pct-admin" type="number" value="0" min="0" max="100" oninput="recalcularCotUI()" onblur="guardarCabezaCot()"> %</span>
-          <span class="total-val" id="cot-val-admin">$ 0</span>
+    <!-- CUADRO DE COTIZACIÓN -->
+    <div class="card sec-items">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between">
+        <span>CUADRO DE COTIZACIÓN</span>
+        <button class="btn-add" onclick="actualizarCuadro()" id="btn-actualizar-cuadro">↻ Actualizar</button>
+      </div>
+      <table class="apu-table">
+        <thead>
+          <tr>
+            <th style="width:40px">ÍTEM</th>
+            <th>DESCRIPCIÓN</th>
+            <th style="width:70px">UND</th>
+            <th style="width:70px">CANT</th>
+            <th style="width:150px">VALOR UNITARIO</th>
+            <th style="width:150px">VALOR TOTAL</th>
+          </tr>
+        </thead>
+        <tbody id="body-cuadro"></tbody>
+      </table>
+      <div class="subtotal-row" style="font-size:16px;font-weight:800;background:#1a237e;color:#fff;border-radius:6px;padding:10px 14px;margin-top:10px">
+        TOTAL OFERTA <span id="cot-total">$ 0</span>
+      </div>
+    </div>
+
+    <!-- CONDICIONES COMERCIALES -->
+    <div class="card sec-general">
+      <div class="sec-header"><span>CONDICIONES COMERCIALES</span></div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>FORMA DE PAGO</label>
+          <textarea id="cot-forma-pago" rows="2" style="width:100%;resize:vertical;font-family:inherit;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px 8px" placeholder="Ej: 50% de anticipo, 45% avance de obra, 5% al finalizar" onblur="guardarCabezaCot()"></textarea>
         </div>
-        <div class="total-row">
-          <span class="label">Imprevistos</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-pct-imprev" type="number" value="0" min="0" max="100" oninput="recalcularCotUI()" onblur="guardarCabezaCot()"> %</span>
-          <span class="total-val" id="cot-val-imprev">$ 0</span>
+        <div class="form-group">
+          <label>PLAZO DE ENTREGA</label>
+          <input id="cot-plazo-entrega" type="text" placeholder="Ej: TRES MESES (3)" onblur="guardarCabezaCot()">
         </div>
-        <div class="total-row">
-          <span class="label">Utilidad</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-pct-util" type="number" value="0" min="0" max="100" oninput="recalcularCotUI()" onblur="guardarCabezaCot()"> %</span>
-          <span class="total-val" id="cot-val-util">$ 0</span>
+        <div class="form-group">
+          <label>VALIDEZ DE LA OFERTA</label>
+          <input id="cot-validez-oferta" type="text" placeholder="Ej: TREINTA (30) DÍAS" onblur="guardarCabezaCot()">
         </div>
-        <div class="total-row final">
-          <span class="label">TOTAL OFERTA</span>
-          <span class="total-val" id="cot-total">$ 0</span>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>NUESTRA OFERTA NO INCLUYE</label>
+          <textarea id="cot-no-incluye" rows="3" style="width:100%;resize:vertical;font-family:inherit;font-size:13px;border:1px solid #ccc;border-radius:4px;padding:6px 8px" placeholder="Descripción de lo que NO incluye esta oferta..." onblur="guardarCabezaCot()"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIRMA DIGITAL -->
+    <div class="card sec-general">
+      <div class="sec-header"><span>FIRMA DIGITAL</span></div>
+      <div style="padding:12px 14px">
+        <p style="font-size:12px;color:#666;margin:0 0 8px 0">Dibuja tu firma — se usará en todos los PDFs de cotización:</p>
+        <canvas id="firma-canvas" width="560" height="130"
+          style="border:1.5px solid #b0bec5;border-radius:6px;cursor:crosshair;touch-action:none;background:#fff;display:block;max-width:100%">
+        </canvas>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button class="btn" onclick="limpiarFirma()" style="background:#eceff1;color:#37474f;font-size:12px">Limpiar</button>
+          <button class="btn btn-primary" onclick="guardarFirma()" style="font-size:12px">Guardar Firma</button>
+          <span id="firma-estado" style="font-size:11px;color:#666"></span>
         </div>
       </div>
     </div>
@@ -624,6 +648,18 @@
   }).format(v || 0);
 
   // ── ESTADO GLOBAL ──
+  const PARTIDAS_FIJAS = [
+    "Suministro Unidades Exteriores",
+    "Suministro Unidades Interiores",
+    "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
+    "Accesorios para Redes de Refrigeración - Sistemas SRV",
+    "Aislamiento Térmico",
+    "Redes de Distribución de Gas",
+    "Mano de Obra e Instalación",
+    "Transporte y Logística",
+    "Otros",
+  ];
+
   let bd         = { materiales: [], manoObra: [], equipos: [] };
   let apuActual  = null;   // { id, ... }
   let creandoAPU = false;  // guard contra doble-creación
@@ -664,7 +700,10 @@
         <td>${a.actividad || '—'}</td>
         <td class="num">${COP(a.costo_neto)}</td>
         <td>${a.fecha || '—'}</td>
-        <td><button class="btn-open" onclick="abrirAPU(${a.id})">Abrir →</button></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn-open" onclick="abrirAPU(${a.id})">Abrir →</button>
+          <button class="btn-del" title="Eliminar APU" onclick="confirmarEliminarAPU(${a.id}, '${(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button>
+        </td>
       </tr>`).join('')}</tbody>
     </table>`;
   }
@@ -699,10 +738,11 @@
 
   function renderFormulario(apu) {
     document.getElementById("apu-titulo").textContent  = "APU — " + (apu.cliente || apu.codigo_item || "#" + apu.id);
-    document.getElementById("f-cliente").value   = apu.cliente      || "";
-    document.getElementById("f-actividad").value = apu.actividad    || "";
-    document.getElementById("f-item").value      = apu.codigo_item  || "";
-    document.getElementById("f-unidad").value    = apu.unidad       || "";
+    document.getElementById("f-cliente").value   = apu.cliente     || "";
+    document.getElementById("f-direccion").value = apu.direccion   || "";
+    document.getElementById("f-actividad").value = apu.actividad   || "";
+    document.getElementById("f-item").value      = apu.codigo_item || "";
+    document.getElementById("f-unidad").value    = apu.unidad      || "";
 
     ["body-equipos","body-materiales","body-mano-obra","body-otros"]
       .forEach(id => document.getElementById(id).innerHTML = "");
@@ -711,17 +751,27 @@
     (apu.materiales || []).forEach(i => renderFila("MATERIAL",  i));
     (apu.mano_obra  || []).forEach(i => renderFila("MANO_OBRA", i));
     (apu.otros      || []).forEach(i => renderFila("OTRO",      i));
+
+    document.getElementById("apu-adm-pct").value  = parseFloat(apu.administracion_pct) || 0;
+    document.getElementById("apu-imp-pct").value  = parseFloat(apu.imprevistos_pct)    || 0;
+    document.getElementById("apu-util-pct").value = parseFloat(apu.utilidad_pct)       || 0;
+    document.getElementById("apu-iva-pct").value  = parseFloat(apu.iva_pct) > 0 ? parseFloat(apu.iva_pct) : 19;
+
     recalcularTotalesUI();
   }
 
   function limpiarFormulario() {
-    ["f-cliente","f-actividad","f-item","f-unidad"].forEach(id =>
+    ["f-cliente","f-direccion","f-actividad","f-item","f-unidad"].forEach(id =>
       document.getElementById(id).value = "");
     ["body-equipos","body-materiales","body-mano-obra","body-otros"].forEach(id =>
       document.getElementById(id).innerHTML = "");
-    ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros",
-     "costo-directo","val-admin","val-imprevistos","val-utilidad","total-final"]
+    ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros","costo-directo",
+     "apu-adm-val","apu-imp-val","apu-util-val","apu-iva-val","apu-valor-total"]
       .forEach(id => document.getElementById(id).textContent = COP(0));
+    document.getElementById("apu-adm-pct").value  = 0;
+    document.getElementById("apu-imp-pct").value  = 0;
+    document.getElementById("apu-util-pct").value = 0;
+    document.getElementById("apu-iva-pct").value  = 19;
   }
 
   // ═══ GUARDAR CABEZA ═══════════════════════════════════════════════════════
@@ -733,11 +783,12 @@
       descripcion: document.getElementById("f-item").value,
       unidad:      document.getElementById("f-unidad").value,
       cliente:     document.getElementById("f-cliente").value,
+      direccion:   document.getElementById("f-direccion").value || "",
       actividad:   document.getElementById("f-actividad").value,
     };
     google.script.run
       .withSuccessHandler(() => setEstado("Guardado ✓"))
-      .actualizarCabezaAPU(apuActual.id, datos);
+      .actualizarCabezaAPU(apuActual, datos);
   }
 
   function guardarAPUManual() {
@@ -752,8 +803,9 @@
     setEstado("Guardando...");
     guardarCabeza();
 
-    const cliente = document.getElementById("f-cliente").value || "";
-    const datos   = { cliente, administracion_pct: 0, imprevistos_pct: 0, utilidad_pct: 0 };
+    const cliente   = document.getElementById("f-cliente").value   || "";
+    const direccion = document.getElementById("f-direccion").value || "";
+    const datos     = { cliente, direccion };
 
     google.script.run
       .withSuccessHandler(res => {
@@ -909,18 +961,37 @@
     document.getElementById("sub-otros").textContent      = COP(subOt);
     document.getElementById("costo-directo").textContent  = COP(neto);
 
-    const pA = parseFloat(document.getElementById("pct-admin").value)      || 0;
-    const pI = parseFloat(document.getElementById("pct-imprevistos").value) || 0;
-    const pU = parseFloat(document.getElementById("pct-utilidad").value)    || 0;
+    const admPct  = parseFloat(document.getElementById("apu-adm-pct").value)  || 0;
+    const impPct  = parseFloat(document.getElementById("apu-imp-pct").value)  || 0;
+    const utilPct = parseFloat(document.getElementById("apu-util-pct").value) || 0;
+    const ivaPct  = parseFloat(document.getElementById("apu-iva-pct").value)  || 0;
 
-    const vA = neto * pA / 100;
-    const vI = neto * pI / 100;
-    const vU = neto * pU / 100;
+    const admVal  = neto * admPct  / 100;
+    const impVal  = neto * impPct  / 100;
+    const utilVal = neto * utilPct / 100;
+    const sinIVA  = neto + admVal + impVal + utilVal;
+    const ivaVal  = sinIVA * ivaPct / 100;
+    const total   = sinIVA + ivaVal;
 
-    document.getElementById("val-admin").textContent       = COP(vA);
-    document.getElementById("val-imprevistos").textContent = COP(vI);
-    document.getElementById("val-utilidad").textContent    = COP(vU);
-    document.getElementById("total-final").textContent     = COP(neto + vA + vI + vU);
+    document.getElementById("apu-adm-val").textContent  = COP(admVal);
+    document.getElementById("apu-imp-val").textContent  = COP(impVal);
+    document.getElementById("apu-util-val").textContent = COP(utilVal);
+    document.getElementById("apu-iva-val").textContent  = COP(ivaVal);
+    document.getElementById("apu-valor-total").textContent = COP(total);
+  }
+
+  function guardarAIU() {
+    if (!apuActual) return;
+    recalcularTotalesUI();
+    const datos = {
+      administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
+      imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
+      utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
+      iva_pct:            parseFloat(document.getElementById("apu-iva-pct").value)  || 0,
+    };
+    google.script.run
+      .withFailureHandler(err => console.error("Error guardando AIU:", err.message))
+      .actualizarCabezaAPU(apuActual, datos);
   }
 
   // ═══ ELIMINAR FILA ════════════════════════════════════════════════════════
@@ -941,7 +1012,7 @@
       renderFila("OTRO", item);
       google.script.run
         .withSuccessHandler(res => reemplazarTempId(tempId, res.id, "OTRO"))
-        .agregarItemAPU(apuActual.id, { tipo: "OTRO", descripcion_manual: "", precio_unitario: 0, cantidad: 1, rendimiento: 1 });
+        .agregarItemAPU(apuActual, { tipo: "OTRO", descripcion_manual: "", precio_unitario: 0, cantidad: 1, rendimiento: 1 });
     });
   }
 
@@ -989,7 +1060,7 @@
 
   function renderHeaderModal(tipo) {
     const cols = {
-      EQUIPO:    ["NOMBRE", "TARIFA/DÍA", ""],
+      EQUIPO:    ["NOMBRE", "PARTIDA", "TARIFA/DÍA", ""],
       MATERIAL:  ["COD.", "CATEGORÍA", "NOMBRE", "UND.", "PRECIO SIN IVA", ""],
       MANO_OBRA: ["DESCRIPCIÓN", "SALARIO MENSUAL", "COSTO/DÍA", ""],
     };
@@ -1043,8 +1114,18 @@
           <td><button class="btn-sel" data-id="${id}" data-tipo="MATERIAL">Agregar</button></td>
         </tr>`;
       } else if (tipoModal === "EQUIPO") {
+        const opts = PARTIDAS_FIJAS.map(p =>
+          `<option value="${p}" ${item.partida === p ? "selected" : ""}>${p}</option>`
+        ).join("");
         return `<tr>
           <td>${item.nombre}</td>
+          <td>
+            <select style="font-size:11px;width:100%;border:1px solid #ccc;border-radius:3px;padding:2px 4px"
+              onchange="cambiarPartidaEquipo(${id}, this.value)">
+              <option value="">— sin partida —</option>
+              ${opts}
+            </select>
+          </td>
           <td class="num">
             ${COP(item.tarifa_dia)}
             <button class="btn-edit-p" data-id="${id}" data-tipo="EQUIPO" title="Editar tarifa">✏</button>
@@ -1106,7 +1187,7 @@
     google.script.run
       .withSuccessHandler(res => reemplazarTempId(tempId, res.id, tipoModal))
       .withFailureHandler(err => alert("Error guardando ítem: " + err.message))
-      .agregarItemAPU(apuActual.id, {
+      .agregarItemAPU(apuActual, {
         tipo:               tipoModal,
         recurso_id:         recurso.id,
         descripcion_manual: recurso.nombre,
@@ -1114,6 +1195,14 @@
         cantidad:           1,
         rendimiento:        1,
       });
+  }
+
+  function cambiarPartidaEquipo(id, partida) {
+    const eq = bd.equipos.find(e => e.id == id);
+    if (eq) eq.partida = partida;
+    google.script.run
+      .withFailureHandler(err => alert("Error guardando partida: " + err.message))
+      .actualizarPartidaEquipo(id, partida);
   }
 
   function editarPrecio(id, tipo) {
@@ -1173,14 +1262,15 @@
       codigo_item: document.getElementById("f-item").value,
       descripcion: document.getElementById("f-item").value,
       unidad:      document.getElementById("f-unidad").value,
-      cliente:     document.getElementById("f-cliente").value || "Sin nombre",
+      cliente:     document.getElementById("f-cliente").value   || "Sin nombre",
+      direccion:   document.getElementById("f-direccion").value || "",
       actividad:   document.getElementById("f-actividad").value,
     };
     setEstado("Guardando APU...");
     google.script.run
       .withSuccessHandler(id => {
         creandoAPU = false;
-        apuActual  = { id };
+        apuActual  = id;
         document.getElementById("apu-titulo").textContent = "APU — " + (datos.cliente || "#" + id);
         setEstado("Guardado ✓");
         cb();
@@ -1256,7 +1346,10 @@
         <td>${c.fecha || '—'}</td>
         <td class="num">${COP(c.valor_total)}</td>
         <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
-        <td><button class="btn-open" onclick="abrirCotizacion(${c.id})">Abrir →</button></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn-open" onclick="abrirCotizacion(${c.id})">Abrir →</button>
+          <button class="btn-del" title="Eliminar cotización" onclick="confirmarEliminarCot(${c.id}, '${(c.numero_oferta || '').replace(/'/g,"\\'")}')">✕</button>
+        </td>
       </tr>`).join('')}</tbody>
     </table>`;
   }
@@ -1287,36 +1380,32 @@
   }
 
   function renderCotizacion(cot) {
-    document.getElementById("cot-titulo").textContent  = cot.numero_oferta    || "Cotización";
-    document.getElementById("cot-cliente").value       = cot.cliente           || "";
-    document.getElementById("cot-direccion").value     = cot.direccion         || "";
-    document.getElementById("cot-notas").value         = cot.notas             || "";
-    document.getElementById("cot-pct-admin").value     = cot.administracion_pct || 0;
-    document.getElementById("cot-pct-imprev").value    = cot.imprevistos_pct    || 0;
-    document.getElementById("cot-pct-util").value      = cot.utilidad_pct       || 0;
+    document.getElementById("cot-titulo").textContent      = cot.numero_oferta    || "Cotización";
+    document.getElementById("cot-forma-pago").value        = cot.forma_pago     || "";
+    document.getElementById("cot-plazo-entrega").value     = cot.plazo_entrega  || "";
+    document.getElementById("cot-validez-oferta").value    = cot.validez_oferta || "";
+    document.getElementById("cot-no-incluye").value        = cot.no_incluye     || "";
     actualizarBadgeAprobada(cot.aprobada === "Sí");
     document.getElementById("body-cot-items").innerHTML = "";
     (cot.items || []).forEach(i => renderFilaCot(i));
-    recalcularCotUI();
+    actualizarCuadro();
   }
 
   function limpiarFormCot() {
-    ["cot-cliente","cot-direccion","cot-notas"].forEach(id => document.getElementById(id).value = "");
-    ["cot-pct-admin","cot-pct-imprev","cot-pct-util"].forEach(id => document.getElementById(id).value = 0);
+    ["cot-forma-pago","cot-plazo-entrega","cot-validez-oferta","cot-no-incluye"]
+      .forEach(id => document.getElementById(id).value = "");
     document.getElementById("body-cot-items").innerHTML = "";
-    ["cot-valor-neto","cot-val-admin","cot-val-imprev","cot-val-util","cot-total"]
-      .forEach(id => document.getElementById(id).textContent = COP(0));
+    document.getElementById("body-cuadro").innerHTML = "";
+    document.getElementById("cot-total").textContent = COP(0);
     actualizarBadgeAprobada(false);
   }
 
   function guardarCabezaCot() {
     const datos = {
-      cliente:           document.getElementById("cot-cliente").value,
-      direccion:         document.getElementById("cot-direccion").value,
-      notas:             document.getElementById("cot-notas").value,
-      administracion_pct: parseFloat(document.getElementById("cot-pct-admin").value)  || 0,
-      imprevistos_pct:    parseFloat(document.getElementById("cot-pct-imprev").value) || 0,
-      utilidad_pct:       parseFloat(document.getElementById("cot-pct-util").value)   || 0,
+      forma_pago:         document.getElementById("cot-forma-pago").value,
+      plazo_entrega:      document.getElementById("cot-plazo-entrega").value,
+      validez_oferta:     document.getElementById("cot-validez-oferta").value,
+      no_incluye:         document.getElementById("cot-no-incluye").value,
     };
     if (!cotActual) {
       setCotEstado("Guardando...");
@@ -1335,62 +1424,72 @@
     }
   }
 
+  // Fila en la sección "APUs Incluidos"
   function renderFilaCot(item) {
-    const tbody = document.getElementById("body-cot-items");
-    const id    = item.id;
-    const cant  = parseFloat(item.cantidad)    || 1;
-    const precio= parseFloat(item.precio_apu)  || 0;
-    const vt    = parseFloat(item.valor_total) || cant * precio;
-    cotItems[id] = { cant, precio, vt };
+    const tbody  = document.getElementById("body-cot-items");
+    const id     = item.id;
+    const precio = parseFloat(item.precio_apu) || 0;
+    cotItems[id] = { precio };
     tbody.insertAdjacentHTML("beforeend", `<tr id="crow-${id}">
-      <td>${item.item_num || ""}</td>
+      <td class="mono">${item.codigo_item || "—"}</td>
       <td>${item.descripcion || "—"}</td>
-      <td>${item.unidad || "—"}</td>
-      <td><input type="number" class="cell-input" value="${cant}" min="0.01" step="0.01"
-          onchange="cambiarCantItem(${id}, this.value)"></td>
+      <td style="text-align:center">${item.unidad || "—"}</td>
       <td class="num">${COP(precio)}</td>
-      <td class="num vp" id="cvt-${id}">${COP(vt)}</td>
       <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
     </tr>`);
-  }
-
-  function cambiarCantItem(id, val) {
-    const f = cotItems[id];
-    if (!f) return;
-    f.cant = parseFloat(val) || 1;
-    f.vt   = f.cant * f.precio;
-    document.getElementById("cvt-" + id).textContent = COP(f.vt);
-    recalcularCotUI();
-    clearTimeout(window["csave_" + id]);
-    window["csave_" + id] = setTimeout(() => {
-      google.script.run.actualizarCantidadItem(id, f.cant);
-    }, 800);
   }
 
   function eliminarFilaCot(id) {
     if (!confirm("¿Eliminar este APU de la cotización?")) return;
     document.getElementById("crow-" + id)?.remove();
     delete cotItems[id];
-    recalcularCotUI();
-    google.script.run.eliminarItemCotizacion(id);
+    google.script.run
+      .withSuccessHandler(() => actualizarCuadro())
+      .eliminarItemCotizacion(id);
+  }
+
+  // Cuadro de cotización agrupado por partidas
+  function actualizarCuadro() {
+    if (!cotActual) return;
+    const tbody = document.getElementById("body-cuadro");
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:12px;color:#888">Calculando...</td></tr>';
+    document.getElementById("btn-actualizar-cuadro").disabled = true;
+    google.script.run
+      .withSuccessHandler(partidas => {
+        document.getElementById("btn-actualizar-cuadro").disabled = false;
+        renderCuadro(partidas);
+      })
+      .withFailureHandler(err => {
+        document.getElementById("btn-actualizar-cuadro").disabled = false;
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#c62828;padding:12px">${err.message}</td></tr>`;
+      })
+      .getPartidasCotizacion(cotActual.id);
+  }
+
+  function renderCuadro(partidas) {
+    const tbody = document.getElementById("body-cuadro");
+    if (!partidas || partidas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:12px;color:#888">Sin datos — agrega APUs primero.</td></tr>';
+      document.getElementById("cot-total").textContent = COP(0);
+      return;
+    }
+    tbody.innerHTML = partidas.map(p => `<tr>
+      <td style="text-align:center;font-weight:700">${p.item_num}</td>
+      <td style="font-weight:600">${p.partida}</td>
+      <td style="text-align:center">Global</td>
+      <td style="text-align:center">1</td>
+      <td class="num">${COP(p.valor)}</td>
+      <td class="num" style="font-weight:700">${COP(p.valor)}</td>
+    </tr>`).join("");
+    const total = partidas.reduce((s, p) => s + (p.valor || 0), 0);
+    document.getElementById("cot-total").textContent = COP(total);
   }
 
   function recalcularCotUI() {
-    const neto = Object.values(cotItems).reduce((s, f) => s + (f.vt || 0), 0);
-    const pA   = parseFloat(document.getElementById("cot-pct-admin").value)  || 0;
-    const pI   = parseFloat(document.getElementById("cot-pct-imprev").value) || 0;
-    const pU   = parseFloat(document.getElementById("cot-pct-util").value)   || 0;
-    const vA   = neto * pA / 100;
-    const vI   = neto * pI / 100;
-    const vU   = neto * pU / 100;
-    document.getElementById("cot-valor-neto").textContent = COP(neto);
-    document.getElementById("cot-val-admin").textContent  = COP(vA);
-    document.getElementById("cot-val-imprev").textContent = COP(vI);
-    document.getElementById("cot-val-util").textContent   = COP(vU);
-    document.getElementById("cot-total").textContent      = COP(neto + vA + vI + vU);
+    if (cotActual) actualizarCuadro();
   }
 
-  function toggleAprobada() {
+    function toggleAprobada() {
     if (!cotActual) return;
     const aprobada = document.getElementById("badge-aprobada").textContent !== "Aprobada";
     actualizarBadgeAprobada(aprobada);
@@ -1419,20 +1518,6 @@
     };
 
     if (!cotActual) {
-      const cliente = document.getElementById("cot-cliente").value;
-      if (!cliente) {
-        alert("Completa primero el campo CLIENTE / OBRA y presiona Tab para guardar.");
-        document.getElementById("cot-cliente").focus();
-        return;
-      }
-      const datos = {
-        cliente,
-        direccion:          document.getElementById("cot-direccion").value,
-        notas:              document.getElementById("cot-notas").value,
-        administracion_pct: parseFloat(document.getElementById("cot-pct-admin").value)  || 0,
-        imprevistos_pct:    parseFloat(document.getElementById("cot-pct-imprev").value) || 0,
-        utilidad_pct:       parseFloat(document.getElementById("cot-pct-util").value)   || 0,
-      };
       setCotEstado("Guardando...");
       google.script.run
         .withSuccessHandler(res => {
@@ -1445,7 +1530,7 @@
           setCotEstado("Error guardando");
           alert("Error guardando cotización: " + err.message);
         })
-        .crearCotizacion(datos);
+        .crearCotizacion({});
       return;
     }
 
@@ -1476,21 +1561,26 @@
 
     const apu    = todosLosAPUs.find(a => a.id == apuId) || {};
     const precio = parseFloat(apu.costo_neto) || 0;
-    const vt     = cant * precio;
     const tempId = "t" + Date.now();
     const item   = {
       id: tempId,
-      item_num: Object.keys(cotItems).length + 1,
+      codigo_item: apu.codigo_item || "",
       descripcion: apu.descripcion || apu.codigo_item || "",
-      unidad: apu.unidad || "",
-      cantidad: cant, precio_apu: precio, valor_total: vt
+      unidad:      apu.unidad || "",
+      precio_apu:  precio,
     };
-    cotItems[tempId] = { cant, precio, vt };
+    cotItems[tempId] = { precio };
     renderFilaCot(item);
-    recalcularCotUI();
 
+    const esElPrimero = Object.keys(cotItems).length === 1;
     google.script.run
-      .withSuccessHandler(res => reemplazarTempIdCot(tempId, res.id))
+      .withSuccessHandler(res => {
+        reemplazarTempIdCot(tempId, res.id);
+        if (esElPrimero && apu.cliente) {
+          google.script.run.actualizarCotizacion(cotActual.id, { cliente: apu.cliente });
+        }
+        actualizarCuadro();
+      })
       .withFailureHandler(err => alert("Error: " + err.message))
       .agregarAPUaCotizacion(cotActual.id, apuId, cant);
   }
@@ -1499,14 +1589,10 @@
     const row = document.getElementById("crow-" + tempId);
     if (row) {
       row.id = "crow-" + realId;
-      row.querySelectorAll("[onchange],[onclick]").forEach(el => {
-        ["onchange","onclick"].forEach(attr => {
-          const v = el.getAttribute(attr);
-          if (v) el.setAttribute(attr, v.replace(new RegExp(tempId, "g"), realId));
-        });
+      row.querySelectorAll("[onclick]").forEach(el => {
+        const v = el.getAttribute("onclick");
+        if (v) el.setAttribute("onclick", v.replace(new RegExp(tempId, "g"), realId));
       });
-      const vtEl = document.getElementById("cvt-" + tempId);
-      if (vtEl) vtEl.id = "cvt-" + realId;
     }
     cotItems[realId] = cotItems[tempId];
     delete cotItems[tempId];
@@ -1544,7 +1630,113 @@
 
   function setCotEstado(msg) { document.getElementById("cot-estado").textContent = msg; }
 
+  // ═══ ELIMINAR APU ═════════════════════════════════════════════════════════
+  function confirmarEliminarAPU(id, nombre) {
+    if (!confirm('¿Eliminar el APU "' + (nombre || id) + '"?\nEsto eliminará también todos sus ítems.')) return;
+    google.script.run
+      .withSuccessHandler(() => mostrarLista())
+      .withFailureHandler(err => alert("Error eliminando APU: " + err.message))
+      .eliminarAPU(id);
+  }
+
+  // ═══ ELIMINAR COTIZACIÓN ══════════════════════════════════════════════════
+  function confirmarEliminarCot(id, numero) {
+    if (!confirm('¿Eliminar la cotización ' + (numero || id) + '?\nEsta acción no se puede deshacer.')) return;
+    google.script.run
+      .withSuccessHandler(() => cargarCotizaciones())
+      .withFailureHandler(err => alert("Error eliminando cotización: " + err.message))
+      .eliminarCotizacion(id);
+  }
+
+  // ═══ ENVIAR COTIZACIÓN POR CORREO ═════════════════════════════════════════
+  function enviarPorCorreo() {
+    if (!cotActual) { alert("Guarda la cotización primero."); return; }
+    const email = prompt("Correo electrónico del cliente:");
+    if (!email || !email.includes("@")) { if (email !== null) alert("Correo inválido."); return; }
+    const btn = document.getElementById("btn-email");
+    btn.textContent = "Enviando...";
+    btn.disabled    = true;
+    setCotEstado("Enviando correo...");
+    google.script.run
+      .withSuccessHandler(res => {
+        btn.textContent = "Enviar →";
+        btn.disabled    = false;
+        if (res.ok) {
+          setCotEstado("Correo enviado ✓");
+        } else {
+          setCotEstado("Error: " + res.error);
+          alert("Error enviando correo: " + res.error);
+        }
+      })
+      .withFailureHandler(err => {
+        btn.textContent = "Enviar →";
+        btn.disabled    = false;
+        setCotEstado("Error: " + err.message);
+        alert("Error: " + err.message);
+      })
+      .enviarCotizacionEmail(cotActual.id, email);
+  }
+
   window.onload = init;
+
+  // ═══ FIRMA DIGITAL ════════════════════════════════════════════════════════════
+  (function () {
+    let dibujando = false;
+    let canvas, ctx;
+
+    function setup() {
+      canvas = document.getElementById("firma-canvas");
+      if (!canvas) return;
+      ctx = canvas.getContext("2d");
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth   = 2;
+      ctx.lineCap     = "round";
+      ctx.lineJoin    = "round";
+
+      canvas.addEventListener("mousedown",  e => { dibujando = true; mover(e); });
+      canvas.addEventListener("mousemove",  e => { if (dibujando) trazar(e); });
+      canvas.addEventListener("mouseup",    ()=> { dibujando = false; ctx.beginPath(); });
+      canvas.addEventListener("mouseleave", ()=> { dibujando = false; ctx.beginPath(); });
+
+      canvas.addEventListener("touchstart", e => { e.preventDefault(); dibujando = true; mover(e.touches[0]); }, { passive: false });
+      canvas.addEventListener("touchmove",  e => { e.preventDefault(); if (dibujando) trazar(e.touches[0]); }, { passive: false });
+      canvas.addEventListener("touchend",   ()=> { dibujando = false; ctx.beginPath(); });
+    }
+
+    function coords(e) {
+      const r = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) * (canvas.width  / r.width),
+        y: (e.clientY - r.top)  * (canvas.height / r.height),
+      };
+    }
+
+    function mover(e) { const p = coords(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+    function trazar(e) { const p = coords(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+
+    window.limpiarFirma = function () {
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById("firma-estado").textContent = "";
+    };
+
+    window.guardarFirma = function () {
+      if (!canvas) return;
+      const estado = document.getElementById("firma-estado");
+      estado.textContent = "Guardando...";
+      const base64 = canvas.toDataURL("image/png");
+      google.script.run
+        .withSuccessHandler(() => { estado.textContent = "✓ Firma guardada"; })
+        .withFailureHandler(err => { estado.textContent = "Error: " + err.message; })
+        .guardarFirmaDigital(base64);
+    };
+
+    // Inicializar cuando el canvas esté disponible en el DOM
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", setup);
+    } else {
+      setup();
+    }
+  })();
 </script>
 </body>
 </html>

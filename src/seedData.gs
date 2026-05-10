@@ -199,7 +199,8 @@ function seedMateriales(ss) {
   const rows = data.map((m, i) => {
     const [codigo, categoria, nombre, unidad, precio_sin_iva, precio_con_iva, precio_2026] = m;
     const conIva = precio_con_iva !== null ? precio_con_iva : Math.round(precio_sin_iva * 1.19);
-    return [i + 1, codigo, categoria, nombre, unidad, precio_sin_iva, conIva, precio_2026 !== "" ? precio_2026 : "", proveedor, fecha];
+    const partida = CAT_A_PARTIDA[categoria] || "Otros";
+    return [i + 1, codigo, categoria, nombre, unidad, precio_sin_iva, conIva, precio_2026 !== "" ? precio_2026 : "", proveedor, fecha, partida];
   });
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
@@ -256,7 +257,7 @@ function seedManoObra(ss) {
   const rows = trabajadores.map((t, i) => {
     const [descripcion, salario] = t;
     const costo_dia = Math.round(salario * (1 + PREST_PCT / 100) / 30);
-    return [i + 1, descripcion, salario, PREST_PCT, costo_dia];
+    return [i + 1, descripcion, salario, PREST_PCT, costo_dia]; // ManoObra no tiene columna 'partida' en BD
   });
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }

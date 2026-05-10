@@ -1,3 +1,37 @@
+// ─── CUADRO DE PARTIDAS ───────────────────────────────────────────────────────
+// Agrupa todos los APU_Items de los APUs en esta cotización por partida.
+// Devuelve array de { item_num, partida, valor } ordenado según PARTIDAS_FIJAS.
+
+function getPartidasCotizacion(cotId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const citems = sheetToObjects(ss, "Cotizacion_Items").filter(r => String(r.cotizacion_id) === String(cotId));
+  if (!citems.length) return [];
+  const apuIds = citems.map(r => String(r.apu_id));
+
+  const allItems = sheetToObjects(ss, "APU_Items")
+    .filter(i => apuIds.includes(String(i.apu_id)));
+
+  const agrupado = {};
+  allItems.forEach(item => {
+    const p = (item.partida && String(item.partida).trim())
+      || getPartidaRecurso(ss, item.tipo, item.recurso_id);
+    agrupado[p] = (agrupado[p] || 0) + (parseFloat(item.valor_parcial) || 0);
+  });
+
+  let num = 1;
+  const resultado = PARTIDAS_FIJAS
+    .filter(p => (agrupado[p] || 0) > 0)
+    .map(p => ({ item_num: num++, partida: p, valor: Math.round(agrupado[p]) }));
+
+  Object.keys(agrupado).forEach(p => {
+    if (!PARTIDAS_FIJAS.includes(p) && agrupado[p] > 0)
+      resultado.push({ item_num: num++, partida: p, valor: Math.round(agrupado[p]) });
+  });
+
+  return resultado;
+}
+
 // ─── EXPORTAR PDF ────────────────────────────────────────────────────────────
 
 function exportarCotizacionPDF(cotId) {
@@ -61,110 +95,186 @@ function obtenerCarpetaPDF() {
 }
 
 function llenarHojaCotizacion(sheet, cot) {
-  const items     = cot.items || [];
-  const valorNeto = parseFloat(cot.valor_neto)  || 0;
-  const total     = parseFloat(cot.valor_total) || 0;
-  const admin     = parseFloat(cot.administracion_pct) || 0;
-  const imprev    = parseFloat(cot.imprevistos_pct)    || 0;
-  const util      = parseFloat(cot.utilidad_pct)       || 0;
-  const MONEY     = '"$"#,##0';
-  const AZUL      = "#1a237e";
-  const AZUL_LITE = "#e8eaf6";
+  const cotItems  = cot.items || [];
+  const valorNeto = parseFloat(cot.valor_neto) || 0;
 
-  sheet.setColumnWidth(1, 40);
-  sheet.setColumnWidth(2, 250);
-  sheet.setColumnWidth(3, 65);
-  sheet.setColumnWidth(4, 70);
-  sheet.setColumnWidth(5, 120);
-  sheet.setColumnWidth(6, 120);
+  const cfg       = getConfig();
+  const empresa   = (cfg["empresa"]          || "").trim();
+  const remitente = (cfg["nombre_remitente"] || "").trim();
+  const logoId    = (cfg["logo_id"]          || "").trim();
+
+  const formaPago     = String(cot.forma_pago     || "").trim();
+  const plazoEntrega  = String(cot.plazo_entrega  || "").trim();
+  const validezOferta = String(cot.validez_oferta || "").trim();
+  const noIncluye     = String(cot.no_incluye     || "").trim();
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const MONEY    = '"$"#,##0';
+  const NEGRO    = "#1F1F1F";
+  const GRIS_SUB = "#9E9E9E";
+  const BORDE    = "#9E9E9E";
+
+  sheet.setColumnWidth(1, 55);
+  sheet.setColumnWidth(2, 290);
+  sheet.setColumnWidth(3, 70);
+  sheet.setColumnWidth(4, 80);
+  sheet.setColumnWidth(5, 125);
+  sheet.setColumnWidth(6, 130);
 
   let r = 1;
 
-  // Encabezado
-  const h1 = sheet.getRange(r, 1, 1, 6);
-  h1.merge().setValue("COTIZACIÓN / OFERTA DE SERVICIOS")
-    .setFontSize(14).setFontWeight("bold").setHorizontalAlignment("center")
-    .setBackground(AZUL).setFontColor("#ffffff");
-  sheet.setRowHeight(r, 36); r++;
-
-  sheet.getRange(r, 1, 1, 3).merge().setValue("N° Oferta:  " + (cot.numero_oferta || "")).setFontWeight("bold");
-  sheet.getRange(r, 4, 1, 3).merge().setValue("Fecha:  " + (cot.fecha || "")).setHorizontalAlignment("right");
-  r++;
-
-  sheet.getRange(r, 1, 1, 6).merge().setValue("Cliente:  " + (cot.cliente || "")).setFontWeight("bold");
-  r++;
-
-  if (cot.direccion) {
-    sheet.getRange(r, 1, 1, 6).merge().setValue("Dirección:  " + cot.direccion);
-    r++;
+  // ─── FILA 1: Logo (izquierda) + Título (derecha) ─────────────────────────────
+  sheet.setRowHeight(r, 85);
+  sheet.getRange(r, 1, 1, 2).merge().setValue("").setBackground("#ffffff");
+  const titulo = [empresa, cot.cliente, cot.direccion].filter(Boolean).join("   -   ");
+  sheet.getRange(r, 3, 1, 4).merge()
+    .setValue(titulo)
+    .setFontSize(13).setFontWeight("bold").setFontColor("#000000")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBackground("#ffffff");
+  if (logoId) {
+    try {
+      const img = sheet.insertImage(DriveApp.getFileById(logoId).getBlob(), 1, r);
+      img.setWidth(215).setHeight(78);
+    } catch(e) {}
   }
-  if (cot.notas) {
-    sheet.getRange(r, 1, 1, 6).merge().setValue("Notas:  " + cot.notas)
-      .setFontStyle("italic").setFontColor("#666666");
-    r++;
-  }
-  r++; // espacio
-
-  // Cabecera tabla
-  sheet.getRange(r, 1, 1, 6).setValues([["#", "DESCRIPCIÓN", "UNIDAD", "CANT.", "PRECIO APU", "VALOR TOTAL"]])
-    .setFontWeight("bold").setBackground(AZUL_LITE).setFontColor(AZUL).setHorizontalAlignment("center");
   r++;
 
-  const firstItemRow = r;
-  if (items.length === 0) {
-    sheet.getRange(r, 1, 1, 6).merge().setValue("Sin ítems")
-      .setFontColor("#888888").setHorizontalAlignment("center");
+  // ─── SEPARADOR ───────────────────────────────────────────────────────────────
+  sheet.setRowHeight(r, 4);
+  sheet.getRange(r, 1, 1, 6).merge().setValue("")
+    .setBorder(false, false, true, false, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+    .setBackground("#ffffff");
+  r++;
+
+  // ─── ENCABEZADO TABLA ────────────────────────────────────────────────────────
+  sheet.setRowHeight(r, 26);
+  sheet.getRange(r, 1, 1, 6)
+    .setValues([["ITEM", "DESCRIPCION", "UNIDAD", "CANTIDAD", "VALOR / UNITARIO", "VALOR / TOTAL"]])
+    .setBackground(NEGRO).setFontColor("#ffffff")
+    .setFontWeight("bold").setFontSize(9)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  r++;
+
+  // ─── FILAS POR PARTIDA (agrupadas automáticamente desde APU_Items) ──────────
+  const partidas = getPartidasCotizacion(cot.id);
+
+  if (partidas.length === 0) {
+    sheet.setRowHeight(r, 22);
+    sheet.getRange(r, 1, 1, 6).merge()
+      .setValue("Sin ítems — agrega APUs a esta cotización.")
+      .setFontSize(9).setFontColor("#888888")
+      .setHorizontalAlignment("center").setBackground("#ffffff");
     r++;
   } else {
-    items.forEach((item, idx) => {
-      const cant   = parseFloat(item.cantidad)    || 1;
-      const precio = parseFloat(item.precio_apu)  || 0;
-      const vt     = parseFloat(item.valor_total) || cant * precio;
-      if (idx % 2 === 0) sheet.getRange(r, 1, 1, 6).setBackground("#f8f9fa");
-      sheet.getRange(r, 1).setValue(item.item_num || idx + 1).setHorizontalAlignment("center");
-      sheet.getRange(r, 2).setValue(item.descripcion || "");
-      sheet.getRange(r, 3).setValue(item.unidad || "").setHorizontalAlignment("center");
-      sheet.getRange(r, 4).setValue(cant).setHorizontalAlignment("right");
-      sheet.getRange(r, 5).setValue(precio).setNumberFormat(MONEY).setHorizontalAlignment("right");
-      sheet.getRange(r, 6).setValue(vt).setNumberFormat(MONEY).setFontWeight("bold").setHorizontalAlignment("right");
+    partidas.forEach(p => {
+      sheet.setRowHeight(r, 22);
+      sheet.getRange(r, 1, 1, 6)
+        .setBackground("#ffffff")
+        .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      sheet.getRange(r, 1).setValue(p.item_num)
+        .setHorizontalAlignment("center").setFontSize(9).setFontWeight("bold");
+      sheet.getRange(r, 2).setValue(p.partida)
+        .setFontSize(9).setFontWeight("bold").setWrap(true).setHorizontalAlignment("left");
+      sheet.getRange(r, 3).setValue("Global")
+        .setHorizontalAlignment("center").setFontSize(9);
+      sheet.getRange(r, 4).setValue(1)
+        .setHorizontalAlignment("center").setFontSize(9);
+      sheet.getRange(r, 5).setValue(p.valor)
+        .setNumberFormat(MONEY).setHorizontalAlignment("right").setFontSize(9);
+      sheet.getRange(r, 6).setValue(p.valor)
+        .setNumberFormat(MONEY).setHorizontalAlignment("right").setFontSize(9);
       r++;
     });
   }
 
-  // Costo neto
-  sheet.getRange(r, 1, 1, 5).merge().setValue("COSTO NETO")
-    .setFontWeight("bold").setHorizontalAlignment("right").setBackground(AZUL_LITE);
-  sheet.getRange(r, 6).setValue(valorNeto).setNumberFormat(MONEY)
-    .setFontWeight("bold").setBackground(AZUL_LITE).setHorizontalAlignment("right");
-  r++; r++; // espacio
-
-  // AIU
-  [["Administración", admin], ["Imprevistos", imprev], ["Utilidad", util]].forEach(([label, pct]) => {
-    sheet.getRange(r, 1, 1, 4).merge().setValue(label + "  (" + pct + "%)").setHorizontalAlignment("right");
-    sheet.getRange(r, 5, 1, 1).merge();
-    sheet.getRange(r, 6).setValue(valorNeto * pct / 100).setNumberFormat(MONEY).setHorizontalAlignment("right");
-    r++;
-  });
+  // ─── TOTAL COSTOS DIRECTOS ────────────────────────────────────────────────────
+  sheet.setRowHeight(r, 22);
+  sheet.getRange(r, 1, 1, 4).merge()
+    .setValue("").setBackground(GRIS_SUB)
+    .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(r, 5)
+    .setValue("TOTAL COSTOS DIRECTOS")
+    .setFontWeight("bold").setFontSize(9)
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(GRIS_SUB)
+    .setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(r, 6)
+    .setValue(valorNeto).setNumberFormat(MONEY)
+    .setFontWeight("bold").setFontSize(9)
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(GRIS_SUB)
+    .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   r++;
 
-  // Total final
-  sheet.getRange(r, 1, 1, 5).merge().setValue("TOTAL OFERTA")
-    .setFontSize(12).setFontWeight("bold").setHorizontalAlignment("right")
-    .setBackground(AZUL).setFontColor("#ffffff");
-  sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
-    .setFontSize(12).setFontWeight("bold").setBackground(AZUL).setFontColor("#ffffff").setHorizontalAlignment("right");
-  r++;
-
-  if (cot.aprobada === "Sí") {
+  // ─── CONDICIONES COMERCIALES ──────────────────────────────────────────────────
+  if (formaPago || plazoEntrega || validezOferta || noIncluye) {
+    r += 2;
+    sheet.setRowHeight(r, 20);
+    sheet.getRange(r, 1, 1, 6).merge()
+      .setValue("CONDICIONES COMERCIALES")
+      .setFontSize(10).setFontWeight("bold").setFontColor("#000000")
+      .setBackground(GRIS_SUB)
+      .setHorizontalAlignment("left").setVerticalAlignment("middle");
     r++;
-    sheet.getRange(r, 1, 1, 6).merge().setValue("✓  COTIZACIÓN APROBADA")
-      .setFontWeight("bold").setFontColor("#2e7d32").setHorizontalAlignment("center").setBackground("#e8f5e9");
+
+    [
+      formaPago     ? ["FORMA DE PAGO",       formaPago]     : null,
+      plazoEntrega  ? ["PLAZO DE ENTREGA",     plazoEntrega]  : null,
+      validezOferta ? ["VALIDEZ DE LA OFERTA", validezOferta] : null,
+    ].filter(Boolean).forEach(([label, valor]) => {
+      sheet.setRowHeight(r, 20);
+      sheet.getRange(r, 1).setValue(label)
+        .setFontSize(9).setFontWeight("bold").setVerticalAlignment("top");
+      sheet.getRange(r, 3, 1, 4).merge()
+        .setValue(valor).setFontSize(9)
+        .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+      r++;
+    });
+
+    if (noIncluye) {
+      r++;
+      sheet.setRowHeight(r, 18);
+      sheet.getRange(r, 1, 1, 6).merge()
+        .setValue("NUESTRA OFERTA NO INCLUYE:")
+        .setFontSize(9).setFontWeight("bold");
+      r++;
+      sheet.getRange(r, 1, 1, 6).merge()
+        .setValue(noIncluye).setFontSize(9).setFontColor("#333333")
+        .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+      sheet.setRowHeight(r, 60);
+      r++;
+    }
   }
 
-  // Borde en la tabla de ítems
-  const numFilas = items.length + 2;
-  sheet.getRange(firstItemRow - 1, 1, numFilas, 6)
-    .setBorder(true, true, true, true, true, true, "#cccccc", SpreadsheetApp.BorderStyle.SOLID);
+  // ─── FIRMA ────────────────────────────────────────────────────────────────────
+  r += 2;
+  // Imagen de firma digital (si existe)
+  const firmaId = (cfg["firma_id"] || "").trim();
+  if (firmaId) {
+    try {
+      sheet.setRowHeight(r, 65);
+      const firmaImg = sheet.insertImage(DriveApp.getFileById(firmaId).getBlob(), 1, r);
+      firmaImg.setWidth(200).setHeight(58);
+    } catch(e) {}
+    r++;
+  }
+  // Línea de firma
+  sheet.setRowHeight(r, 4);
+  sheet.getRange(r, 1, 1, 3).merge()
+    .setBorder(false, false, true, false, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  r++;
+  // Nombre y empresa
+  const firmaLinea = [remitente, empresa].filter(Boolean).join("\n");
+  if (firmaLinea) {
+    sheet.setRowHeight(r, remitente && empresa ? 36 : 20);
+    sheet.getRange(r, 1, 1, 6).merge()
+      .setValue(firmaLinea).setFontSize(9).setFontWeight("bold")
+      .setHorizontalAlignment("left").setVerticalAlignment("top")
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  }
 }
 
 // ─── LISTAR COTIZACIONES ──────────────────────────────────────────────────────
@@ -201,8 +311,13 @@ function crearCotizacion(datos) {
     datos.administracion_pct || 0,
     datos.imprevistos_pct    || 0,
     datos.utilidad_pct       || 0,
+    datos.iva_pct !== undefined ? datos.iva_pct : 19,
     0, "No",
-    datos.notas || ""
+    datos.notas          || "",
+    datos.forma_pago     || "",
+    datos.plazo_entrega  || "",
+    datos.validez_oferta || "",
+    datos.no_incluye     || "",
   ]);
 
   return { id: newId, numero_oferta: numero };
@@ -327,7 +442,7 @@ function actualizarCotizacion(cotId, datos) {
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == cotId) {
-      const campos = ["cliente","direccion","administracion_pct","imprevistos_pct","utilidad_pct","aprobada","notas"];
+      const campos = ["cliente","direccion","administracion_pct","imprevistos_pct","utilidad_pct","iva_pct","aprobada","notas","forma_pago","plazo_entrega","validez_oferta","no_incluye"];
       campos.forEach(campo => {
         if (datos[campo] !== undefined) {
           const col = h.indexOf(campo);
@@ -339,6 +454,143 @@ function actualizarCotizacion(cotId, datos) {
     }
   }
   return { ok: false };
+}
+
+// ─── ELIMINAR COTIZACIÓN ─────────────────────────────────────────────────────
+
+function eliminarCotizacion(cotId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const itemsSheet = ss.getSheetByName("Cotizacion_Items");
+  const itemsData  = itemsSheet.getDataRange().getValues();
+  const ih         = itemsData[0];
+  for (let i = itemsData.length - 1; i >= 1; i--) {
+    if (itemsData[i][ih.indexOf("cotizacion_id")] == cotId) itemsSheet.deleteRow(i + 1);
+  }
+
+  const cotSheet = ss.getSheetByName("Cotizaciones");
+  const cotData  = cotSheet.getDataRange().getValues();
+  for (let i = 1; i < cotData.length; i++) {
+    if (cotData[i][0] == cotId) { cotSheet.deleteRow(i + 1); return { ok: true }; }
+  }
+  return { ok: false };
+}
+
+// ─── ENVIAR COTIZACIÓN POR CORREO ─────────────────────────────────────────────
+
+function enviarCotizacionEmail(cotId, emailDestino) {
+  try {
+    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    const cot = getCotizacionCompleta(cotId);
+    if (!cot) return { ok: false, error: "Cotización no encontrada" };
+
+    // Generar PDF
+    const tmpName = "_cot_email_tmp_";
+    let tmp = ss.getSheetByName(tmpName);
+    if (tmp) ss.deleteSheet(tmp);
+    tmp = ss.insertSheet(tmpName);
+    llenarHojaCotizacion(tmp, cot);
+    SpreadsheetApp.flush();
+
+    const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
+      + "/export?format=pdf&gid=" + tmp.getSheetId()
+      + "&portrait=true&fitw=true&size=letter"
+      + "&gridlines=false&printtitle=false&sheetnames=false"
+      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+
+    const blob = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
+    }).getBlob().setName("Cotizacion_" + (cot.numero_oferta || cotId) + ".pdf");
+
+    ss.deleteSheet(tmp);
+
+    const cfg     = getConfig();
+    const nombre  = (cfg["nombre_remitente"] || "").trim() || Session.getActiveUser().getEmail();
+    const empresa = (cfg["empresa"] || "").trim();
+
+    const total    = Math.round(parseFloat(cot.valor_total) || 0);
+    const totalFmt = "$" + total.toLocaleString("es-CO");
+    const firma    = empresa ? nombre + "\n" + empresa : nombre;
+    const asunto   = (cot.numero_oferta || "Cotización") + " - " + (cot.cliente || "");
+
+    const textPlano = "Estimado/a cliente,\n\n"
+      + "Le hago llegar la cotización " + (cot.numero_oferta || "") + " solicitada.\n"
+      + "Valor total: " + totalFmt + "\n\n"
+      + "El documento se encuentra adjunto a este correo.\n\n"
+      + "Quedo atento a sus comentarios.\n\n" + firma;
+
+    const firmaHtml = empresa
+      ? '<strong>' + nombre + '</strong><br><span style="color:#666">' + empresa + '</span>'
+      : '<strong>' + nombre + '</strong>';
+
+    const htmlBody = '<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#222">'
+      + '<p>Estimado/a cliente,</p>'
+      + '<p>Le hago llegar la cotización <strong>' + (cot.numero_oferta || "") + '</strong> solicitada.</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px">'
+      + '<tr style="background:#f0f2f5"><td style="padding:10px 14px;border:1px solid #ddd;color:#555;width:130px">N° Oferta</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd;font-weight:600">' + (cot.numero_oferta || "—") + '</td></tr>'
+      + '<tr><td style="padding:10px 14px;border:1px solid #ddd;color:#555">Cliente</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd">' + (cot.cliente || "—") + '</td></tr>'
+      + '<tr style="background:#f0f2f5"><td style="padding:10px 14px;border:1px solid #ddd;color:#555">Valor Total</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd;font-weight:700;color:#1a237e">' + totalFmt + '</td></tr>'
+      + '</table>'
+      + '<p>El documento se encuentra adjunto a este correo.</p>'
+      + '<p>Quedo atento a sus comentarios.</p>'
+      + '<br><p style="margin:0">' + firmaHtml + '</p>'
+      + '</div>';
+
+    blob.setContentType("application/pdf");
+
+    GmailApp.sendEmail(emailDestino, asunto, textPlano, {
+      name:        nombre,
+      replyTo:     Session.getActiveUser().getEmail(),
+      attachments: [blob],
+      htmlBody,
+    });
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ─── GUARDAR FIRMA DIGITAL ────────────────────────────────────────────────────
+
+function guardarFirmaDigital(base64Png) {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const base64 = base64Png.replace(/^data:image\/png;base64,/, "");
+  const blob   = Utilities.newBlob(Utilities.base64Decode(base64), "image/png", "firma_digital.png");
+
+  // Eliminar firma anterior si existe
+  const cfg     = getConfig();
+  const oldId   = (cfg["firma_id"] || "").trim();
+  if (oldId) {
+    try { DriveApp.getFileById(oldId).setTrashed(true); } catch(e) {}
+  }
+
+  // Guardar en carpeta_firma si está configurada, si no en la carpeta del spreadsheet
+  const carpetaFirmaId = (cfg["carpeta_firma"] || "").trim();
+  let folder;
+  if (carpetaFirmaId) {
+    try { folder = DriveApp.getFolderById(carpetaFirmaId); } catch(e) { folder = null; }
+  }
+  if (!folder) {
+    const parents = DriveApp.getFileById(ss.getId()).getParents();
+    folder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  }
+  const file = folder.createFile(blob);
+  const fileId  = file.getId();
+
+  // Actualizar firma_id en Configuracion
+  const cfgSheet = ss.getSheetByName("Configuracion");
+  const data     = cfgSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === "firma_id") {
+      cfgSheet.getRange(i + 1, 2).setValue(fileId);
+      return { ok: true };
+    }
+  }
+  cfgSheet.appendRow(["firma_id", fileId, "ID del archivo de firma digital en Drive"]);
+  return { ok: true };
 }
 
 // ─── HELPER: RECALCULAR TOTALES ───────────────────────────────────────────────
@@ -364,9 +616,9 @@ function recalcularCotizacion(ss, cotId) {
       const admin  = parseFloat(cotData[i][cotH.indexOf("administracion_pct")]) || 0;
       const imprev = parseFloat(cotData[i][cotH.indexOf("imprevistos_pct")])    || 0;
       const util   = parseFloat(cotData[i][cotH.indexOf("utilidad_pct")])       || 0;
-      const total  = valorNeto * (1 + (admin + imprev + util) / 100);
+      const iva    = parseFloat(cotData[i][cotH.indexOf("iva_pct")])            || 0;
       cotSheet.getRange(i + 1, cotH.indexOf("valor_neto")  + 1).setValue(valorNeto);
-      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(total);
+      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(valorNeto);
       break;
     }
   }
