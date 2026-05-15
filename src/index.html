@@ -47,8 +47,6 @@
     .btn-sel      { background: #1a237e; color: #fff; border: none; border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 11px; white-space: nowrap; }
     .btn-sel:hover { background: #283593; }
     .btn-open     { background: none; border: 1px solid #1a237e; color: #1a237e; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-size: 11px; }
-    .btn-edit-p   { background: none; border: none; color: #888; cursor: pointer; font-size: 11px; padding: 0 2px; }
-    .btn-edit-p:hover { color: #1a237e; }
 
     /* ── CONTENEDOR ── */
     .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
@@ -314,6 +312,7 @@
       <button class="tab-btn active" id="tab-apus" onclick="irTabAPUs()">APUs</button>
       <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Cotizaciones</button>
     </div>
+    <button class="btn btn-back" onclick="abrirGestionarBD()" style="border-color:rgba(255,255,255,0.5)">⚙ BD de Precios</button>
     <button class="btn btn-primary" id="btn-nuevo" onclick="nuevoActual()">+ Nuevo APU</button>
   </div>
   <div class="container">
@@ -332,7 +331,6 @@
     <h2 id="apu-titulo">Nuevo APU</h2>
     <span class="estado-tag" id="apu-estado"></span>
     <button class="btn btn-primary" onclick="guardarAPUManual()" style="margin-left:auto">Guardar APU</button>
-    <button class="btn btn-primary" onclick="crearCotizacionDesdeAPU()" style="background:#2e7d32;color:#fff">Crear Cotización →</button>
   </div>
 
   <div class="container">
@@ -440,9 +438,9 @@
         <thead>
           <tr>
             <th style="min-width:200px">DESCRIPCIÓN</th>
-            <th style="width:140px">VALOR TOTAL (i)</th>
-            <th style="width:140px">CANTIDAD UND. (j)</th>
-            <th style="width:140px">VALOR PARCIAL (i/j)</th>
+            <th style="width:140px">COSTO UNIT. (i)</th>
+            <th style="width:140px">CANTIDAD (j)</th>
+            <th style="width:140px">VALOR PARCIAL (i×j)</th>
             <th style="width:32px"></th>
           </tr>
         </thead>
@@ -455,35 +453,17 @@
     <div class="card sec-totales">
       <div class="sec-header"><span>RESUMEN</span></div>
       <div class="totales-body">
-        <div class="total-row">
-          <span class="label">E — COSTO DIRECTO &nbsp;<small style="color:#999">(A + B + C + D)</small></span>
+        <div class="total-row final">
+          <span class="label">PRECIO UNITARIO &nbsp;<small style="color:#999">(A + B + C + D)</small></span>
           <span class="total-val" id="costo-directo">$ 0</span>
         </div>
-        <div class="total-row">
-          <span class="label">F — ADMINISTRACIÓN</span>
-          <span class="pct-wrap"><input class="pct-input" id="apu-adm-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
-          <span class="total-val" id="apu-adm-val">$ 0</span>
-        </div>
-        <div class="total-row">
-          <span class="label">G — IMPREVISTOS</span>
-          <span class="pct-wrap"><input class="pct-input" id="apu-imp-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
-          <span class="total-val" id="apu-imp-val">$ 0</span>
-        </div>
-        <div class="total-row">
-          <span class="label">H — UTILIDAD</span>
-          <span class="pct-wrap"><input class="pct-input" id="apu-util-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIU()"> %</span>
-          <span class="total-val" id="apu-util-val">$ 0</span>
-        </div>
-        <div class="total-row">
-          <span class="label">I — IVA</span>
-          <span class="pct-wrap"><input class="pct-input" id="apu-iva-pct" type="number" min="0" max="100" step="0.5" value="19" onchange="guardarAIU()"> %</span>
-          <span class="total-val" id="apu-iva-val">$ 0</span>
-        </div>
-        <div class="total-row final">
-          <span class="label">VALOR TOTAL &nbsp;<small style="color:#999">(E + F + G + H + I)</small></span>
-          <span class="total-val" id="apu-valor-total">$ 0</span>
-        </div>
       </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;padding:12px 0 4px">
+      <button class="btn btn-primary" onclick="crearCotizacionDesdeAPU()" style="background:#2e7d32;color:#fff;font-size:14px;padding:10px 22px">
+        Crear Cotización con este APU →
+      </button>
     </div>
 
   </div><!-- /container -->
@@ -497,52 +477,67 @@
     <button class="btn btn-back" onclick="irTabCots()">← Volver</button>
     <h2 id="cot-titulo">Nueva Cotización</h2>
     <span class="estado-tag" id="cot-estado"></span>
-    <button class="btn btn-primary" id="btn-pdf" onclick="exportarPDF()" style="margin-left:auto">Exportar PDF</button>
-    <button class="btn btn-primary" id="btn-email" onclick="enviarPorCorreo()" style="background:#1565c0;color:#fff">Enviar →</button>
   </div>
   <div class="container">
-
-    <!-- APUs INCLUIDOS -->
-    <div class="card sec-items">
-      <div class="sec-header">
-        <span>APUs INCLUIDOS</span>
-        <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
-      </div>
-      <table class="apu-table">
-        <thead>
-          <tr>
-            <th style="width:90px">CÓDIGO</th>
-            <th>DESCRIPCIÓN / ACTIVIDAD</th>
-            <th style="width:80px">UNIDAD</th>
-            <th style="width:140px">COSTO NETO</th>
-            <th style="width:32px"></th>
-          </tr>
-        </thead>
-        <tbody id="body-cot-items"></tbody>
-      </table>
-    </div>
 
     <!-- CUADRO DE COTIZACIÓN -->
     <div class="card sec-items">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>CUADRO DE COTIZACIÓN</span>
-        <button class="btn-add" onclick="actualizarCuadro()" id="btn-actualizar-cuadro">↻ Actualizar</button>
+        <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
       </div>
       <table class="apu-table">
         <thead>
           <tr>
             <th style="width:40px">ÍTEM</th>
-            <th>DESCRIPCIÓN</th>
-            <th style="width:70px">UND</th>
-            <th style="width:70px">CANT</th>
-            <th style="width:150px">VALOR UNITARIO</th>
-            <th style="width:150px">VALOR TOTAL</th>
+            <th style="width:80px">CÓDIGO</th>
+            <th>DESCRIPCIÓN / ACTIVIDAD</th>
+            <th style="width:65px">UND</th>
+            <th style="width:90px">CANTIDAD</th>
+            <th style="width:140px">VR. UNITARIO</th>
+            <th style="width:140px">VR. TOTAL</th>
+            <th style="width:32px"></th>
           </tr>
         </thead>
         <tbody id="body-cuadro"></tbody>
       </table>
-      <div class="subtotal-row" style="font-size:16px;font-weight:800;background:#1a237e;color:#fff;border-radius:6px;padding:10px 14px;margin-top:10px">
-        TOTAL OFERTA <span id="cot-total">$ 0</span>
+      <div class="subtotal-row" style="background:#37474f;color:#fff;padding:8px 14px;margin-top:6px">
+        COSTO DIRECTO <span id="cot-subtotal">$ 0</span>
+      </div>
+    </div>
+
+    <!-- AIU Y VALOR TOTAL -->
+    <div class="card sec-totales">
+      <div class="sec-header"><span>ADMINISTRACIÓN · IMPREVISTOS · UTILIDAD</span></div>
+      <div class="totales-body">
+        <div class="total-row">
+          <span class="label">COSTO DIRECTO</span>
+          <span class="total-val" id="cot-cd-val">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">ADMINISTRACIÓN</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-adm-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="total-val" id="cot-adm-val">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">IMPREVISTOS</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-imp-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="total-val" id="cot-imp-val">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">UTILIDAD</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-util-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="total-val" id="cot-util-val">$ 0</span>
+        </div>
+        <div class="total-row">
+          <span class="label">IVA</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-iva-pct" type="number" min="0" max="100" step="0.5" value="19" onchange="guardarAIUCot()"> %</span>
+          <span class="total-val" id="cot-iva-val">$ 0</span>
+        </div>
+        <div class="total-row final">
+          <span class="label">VALOR TOTAL OFERTA</span>
+          <span class="total-val" id="cot-total">$ 0</span>
+        </div>
       </div>
     </div>
 
@@ -592,6 +587,68 @@
       <span id="badge-aprobada" class="badge badge-no">Pendiente</span>
     </div>
 
+    <div style="display:flex;justify-content:flex-end;padding:12px 0 4px">
+      <button class="btn btn-primary" id="btn-email" onclick="enviarPorCorreo()" style="background:#1565c0;color:#fff;font-size:14px;padding:10px 22px">
+        Enviar y guardar PDF →
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: GESTIÓN BD DE PRECIOS
+════════════════════════════════════════════════ -->
+<div id="modal-bd" onclick="cerrarModalBD(event)"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div class="modal-box" style="max-width:980px;width:100%">
+    <div class="modal-header">
+      <h3>Base de Datos de Precios</h3>
+      <button class="btn-close" onclick="cerrarModalBD()">✕</button>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;padding:10px 18px 0;background:#f5f5f5;border-bottom:1px solid #ddd">
+      <button id="bd-tab-MAT" onclick="bdCambiarTab('MAT')"
+        style="padding:6px 18px;border:1px solid #1a237e;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:700;background:#1a237e;color:#fff">
+        Materiales
+      </button>
+      <button id="bd-tab-MO" onclick="bdCambiarTab('MO')"
+        style="padding:6px 18px;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:500;background:#fff;color:#555">
+        Mano de Obra
+      </button>
+      <button id="bd-tab-EQ" onclick="bdCambiarTab('EQ')"
+        style="padding:6px 18px;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:500;background:#fff;color:#555">
+        Equipos
+      </button>
+    </div>
+
+    <!-- Formulario agregar / editar -->
+    <div id="bd-form" style="display:none;padding:14px 18px;background:#e8eaf6;border-bottom:1px solid #c5cae9">
+      <div style="font-size:11px;font-weight:700;color:#1a237e;letter-spacing:.4px;margin-bottom:10px" id="bd-form-titulo">NUEVO REGISTRO</div>
+      <div id="bd-form-fields" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        <button class="btn btn-primary" onclick="guardarRecursoBD()" style="font-size:12px;padding:7px 18px">Guardar</button>
+        <button class="btn" onclick="cancelarFormBD()" style="background:#eceff1;color:#37474f;font-size:12px;padding:7px 14px">Cancelar</button>
+        <span id="bd-form-estado" style="font-size:11px;color:#555;margin-left:4px"></span>
+      </div>
+    </div>
+
+    <!-- Barra de búsqueda + botón agregar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-bottom:1px solid #eee">
+      <input id="bd-search" type="text" placeholder="Buscar..." oninput="filtrarBD()"
+             style="border:1px solid #ddd;border-radius:4px;padding:7px 10px;font-size:12px;width:260px;outline:none">
+      <span id="bd-count" style="font-size:11px;color:#999"></span>
+      <button onclick="mostrarFormBD(null)" style="background:#1a237e;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar</button>
+    </div>
+
+    <!-- Tabla de resultados -->
+    <div class="modal-results" style="max-height:420px;overflow-y:auto">
+      <table class="modal-table" style="width:100%;border-collapse:collapse">
+        <thead id="bd-thead"></thead>
+        <tbody id="bd-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -752,11 +809,6 @@
     (apu.mano_obra  || []).forEach(i => renderFila("MANO_OBRA", i));
     (apu.otros      || []).forEach(i => renderFila("OTRO",      i));
 
-    document.getElementById("apu-adm-pct").value  = parseFloat(apu.administracion_pct) || 0;
-    document.getElementById("apu-imp-pct").value  = parseFloat(apu.imprevistos_pct)    || 0;
-    document.getElementById("apu-util-pct").value = parseFloat(apu.utilidad_pct)       || 0;
-    document.getElementById("apu-iva-pct").value  = parseFloat(apu.iva_pct) > 0 ? parseFloat(apu.iva_pct) : 19;
-
     recalcularTotalesUI();
   }
 
@@ -765,13 +817,8 @@
       document.getElementById(id).value = "");
     ["body-equipos","body-materiales","body-mano-obra","body-otros"].forEach(id =>
       document.getElementById(id).innerHTML = "");
-    ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros","costo-directo",
-     "apu-adm-val","apu-imp-val","apu-util-val","apu-iva-val","apu-valor-total"]
+    ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros","costo-directo"]
       .forEach(id => document.getElementById(id).textContent = COP(0));
-    document.getElementById("apu-adm-pct").value  = 0;
-    document.getElementById("apu-imp-pct").value  = 0;
-    document.getElementById("apu-util-pct").value = 0;
-    document.getElementById("apu-iva-pct").value  = 19;
   }
 
   // ═══ GUARDAR CABEZA ═══════════════════════════════════════════════════════
@@ -903,9 +950,9 @@
             placeholder="Ej: Transporte, izaje..."
             onchange="cambiarDesc('${id}','OTRO',this.value)"></td>
         <td><input type="number" class="cell-input" value="${precio}" min="0"
-            placeholder="Valor total" onchange="cambiar('${id}','OTRO','precio',this.value)"></td>
+            placeholder="Costo unitario" onchange="cambiar('${id}','OTRO','precio',this.value)"></td>
         <td><input type="number" class="cell-input" value="${cant || 1}" min="1"
-            placeholder="# unidades" onchange="cambiar('${id}','OTRO','cant',this.value)"></td>
+            placeholder="Cantidad" onchange="cambiar('${id}','OTRO','cant',this.value)"></td>
         <td class="num vp" id="vp-${id}">${COP(vp)}</td>
         <td><button class="btn-del" onclick="eliminarFila('${id}','OTRO')">✕</button></td>
       </tr>`;
@@ -943,12 +990,12 @@
   function calcVP(tipo, cant, precio, rend) {
     if (tipo === "EQUIPO"   || tipo === "MANO_OBRA") return rend > 0 ? (cant * precio) / rend : 0;
     if (tipo === "MATERIAL")                          return cant * precio;
-    if (tipo === "OTRO")                              return cant > 0 ? precio / cant : 0;
+    if (tipo === "OTRO")                              return precio * cant;
     return 0;
   }
 
   function recalcularTotalesUI() {
-    const suma = tipo => Object.values(filas[tipo]).reduce((a, f) => a + (f.vp || 0), 0);
+    const suma = tipo => Object.values(filas[tipo]).reduce((a, f) => a + (f ? (f.vp || 0) : 0), 0);
     const subEq  = suma("EQUIPO");
     const subMat = suma("MATERIAL");
     const subMo  = suma("MANO_OBRA");
@@ -960,38 +1007,6 @@
     document.getElementById("sub-mano-obra").textContent  = COP(subMo);
     document.getElementById("sub-otros").textContent      = COP(subOt);
     document.getElementById("costo-directo").textContent  = COP(neto);
-
-    const admPct  = parseFloat(document.getElementById("apu-adm-pct").value)  || 0;
-    const impPct  = parseFloat(document.getElementById("apu-imp-pct").value)  || 0;
-    const utilPct = parseFloat(document.getElementById("apu-util-pct").value) || 0;
-    const ivaPct  = parseFloat(document.getElementById("apu-iva-pct").value)  || 0;
-
-    const admVal  = neto * admPct  / 100;
-    const impVal  = neto * impPct  / 100;
-    const utilVal = neto * utilPct / 100;
-    const sinIVA  = neto + admVal + impVal + utilVal;
-    const ivaVal  = sinIVA * ivaPct / 100;
-    const total   = sinIVA + ivaVal;
-
-    document.getElementById("apu-adm-val").textContent  = COP(admVal);
-    document.getElementById("apu-imp-val").textContent  = COP(impVal);
-    document.getElementById("apu-util-val").textContent = COP(utilVal);
-    document.getElementById("apu-iva-val").textContent  = COP(ivaVal);
-    document.getElementById("apu-valor-total").textContent = COP(total);
-  }
-
-  function guardarAIU() {
-    if (!apuActual) return;
-    recalcularTotalesUI();
-    const datos = {
-      administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
-      imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
-      utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
-      iva_pct:            parseFloat(document.getElementById("apu-iva-pct").value)  || 0,
-    };
-    google.script.run
-      .withFailureHandler(err => console.error("Error guardando AIU:", err.message))
-      .actualizarCabezaAPU(apuActual, datos);
   }
 
   // ═══ ELIMINAR FILA ════════════════════════════════════════════════════════
@@ -1060,7 +1075,7 @@
 
   function renderHeaderModal(tipo) {
     const cols = {
-      EQUIPO:    ["NOMBRE", "PARTIDA", "TARIFA/DÍA", ""],
+      EQUIPO:    ["NOMBRE", "TARIFA/DÍA", ""],
       MATERIAL:  ["COD.", "CATEGORÍA", "NOMBRE", "UND.", "PRECIO SIN IVA", ""],
       MANO_OBRA: ["DESCRIPCIÓN", "SALARIO MENSUAL", "COSTO/DÍA", ""],
     };
@@ -1107,38 +1122,19 @@
           <td><span class="badge">${item.categoria || ""}</span></td>
           <td>${item.nombre}</td>
           <td>${item.unidad}</td>
-          <td class="num">
-            ${COP(item.precio_sin_iva)}
-            <button class="btn-edit-p" data-id="${id}" data-tipo="MATERIAL" title="Editar precio">✏</button>
-          </td>
+          <td class="num">${COP(item.precio_sin_iva)}</td>
           <td><button class="btn-sel" data-id="${id}" data-tipo="MATERIAL">Agregar</button></td>
         </tr>`;
       } else if (tipoModal === "EQUIPO") {
-        const opts = PARTIDAS_FIJAS.map(p =>
-          `<option value="${p}" ${item.partida === p ? "selected" : ""}>${p}</option>`
-        ).join("");
         return `<tr>
           <td>${item.nombre}</td>
-          <td>
-            <select style="font-size:11px;width:100%;border:1px solid #ccc;border-radius:3px;padding:2px 4px"
-              onchange="cambiarPartidaEquipo(${id}, this.value)">
-              <option value="">— sin partida —</option>
-              ${opts}
-            </select>
-          </td>
-          <td class="num">
-            ${COP(item.tarifa_dia)}
-            <button class="btn-edit-p" data-id="${id}" data-tipo="EQUIPO" title="Editar tarifa">✏</button>
-          </td>
+          <td class="num">${COP(item.tarifa_dia)}</td>
           <td><button class="btn-sel" data-id="${id}" data-tipo="EQUIPO">Agregar</button></td>
         </tr>`;
       } else if (tipoModal === "MANO_OBRA") {
         return `<tr>
           <td>${item.descripcion}</td>
-          <td class="num">
-            ${COP(item.salario_mensual)}
-            <button class="btn-edit-p" data-id="${id}" data-tipo="MANO_OBRA" title="Editar salario">✏</button>
-          </td>
+          <td class="num">${COP(item.salario_mensual)}</td>
           <td class="num">${COP(item.costo_dia)}</td>
           <td><button class="btn-sel" data-id="${id}" data-tipo="MANO_OBRA">Agregar</button></td>
         </tr>`;
@@ -1146,12 +1142,10 @@
     }).join("");
   }
 
-  // Delegación de eventos en el modal (evita JSON en atributos onclick)
+  // Delegación de eventos en el modal
   document.getElementById("modal-tbody").addEventListener("click", e => {
-    const selBtn  = e.target.closest(".btn-sel");
-    const editBtn = e.target.closest(".btn-edit-p");
-    if (selBtn)  seleccionarRecurso(selBtn.dataset.id, selBtn.dataset.tipo);
-    if (editBtn) editarPrecio(editBtn.dataset.id, editBtn.dataset.tipo);
+    const selBtn = e.target.closest(".btn-sel");
+    if (selBtn) seleccionarRecurso(selBtn.dataset.id, selBtn.dataset.tipo);
   });
 
   function seleccionarRecurso(id, tipo) {
@@ -1164,7 +1158,8 @@
       recurso = { id, nombre: e.nombre, precio: e.tarifa_dia };
     } else if (tipo === "MANO_OBRA") {
       const m = bd.manoObra.find(x => x.id == id);
-      recurso = { id, nombre: m.descripcion, precio: m.costo_dia };
+      const costoDia = m.costo_dia || Math.round(m.salario_mensual * (1 + (m.prestaciones_pct || 54) / 100) / 30);
+      recurso = { id, nombre: m.descripcion, precio: costoDia };
     }
     cerrarModal();
 
@@ -1205,36 +1200,6 @@
       .actualizarPartidaEquipo(id, partida);
   }
 
-  function editarPrecio(id, tipo) {
-    let recurso, actual, campo;
-    if (tipo === "MATERIAL") {
-      recurso = bd.materiales.find(x => x.id == id);
-      actual  = recurso.precio_sin_iva;
-      campo   = "precio_sin_iva";
-    } else if (tipo === "EQUIPO") {
-      recurso = bd.equipos.find(x => x.id == id);
-      actual  = recurso.tarifa_dia;
-      campo   = "tarifa_dia";
-    } else if (tipo === "MANO_OBRA") {
-      recurso = bd.manoObra.find(x => x.id == id);
-      actual  = recurso.salario_mensual;
-      campo   = "salario_mensual";
-    }
-    const nuevo = prompt(
-      `Actualizar "${recurso.nombre || recurso.descripcion}"\nPrecio actual: ${COP(actual)}`,
-      actual
-    );
-    if (nuevo === null || isNaN(parseFloat(nuevo))) return;
-    const nuevoPrecio = parseFloat(nuevo);
-
-    // Actualizar caché local
-    recurso[campo] = nuevoPrecio;
-    if (tipo === "MANO_OBRA") recurso.costo_dia = Math.round(nuevoPrecio * 1.54 / 30);
-
-    google.script.run
-      .withSuccessHandler(() => filtrarModal())
-      .actualizarPrecioRecurso(tipo, id, nuevoPrecio);
-  }
 
   // ═══ HELPERS ══════════════════════════════════════════════════════════════
   function reemplazarTempId(tempId, realId, tipo) {
@@ -1250,8 +1215,10 @@
       const vpEl = document.getElementById("vp-" + tempId);
       if (vpEl) vpEl.id = "vp-" + realId;
     }
-    filas[tipo][realId] = filas[tipo][tempId];
-    delete filas[tipo][tempId];
+    if (tempId in filas[tipo]) {
+      filas[tipo][realId] = filas[tipo][tempId];
+      delete filas[tipo][tempId];
+    }
   }
 
   function asegurarAPUluego(cb) {
@@ -1380,23 +1347,35 @@
   }
 
   function renderCotizacion(cot) {
-    document.getElementById("cot-titulo").textContent      = cot.numero_oferta    || "Cotización";
-    document.getElementById("cot-forma-pago").value        = cot.forma_pago     || "";
-    document.getElementById("cot-plazo-entrega").value     = cot.plazo_entrega  || "";
-    document.getElementById("cot-validez-oferta").value    = cot.validez_oferta || "";
-    document.getElementById("cot-no-incluye").value        = cot.no_incluye     || "";
+    document.getElementById("cot-titulo").textContent   = cot.numero_oferta || "Cotización";
+    document.getElementById("cot-forma-pago").value     = cot.forma_pago     || "";
+    document.getElementById("cot-plazo-entrega").value  = cot.plazo_entrega  || "";
+    document.getElementById("cot-validez-oferta").value = cot.validez_oferta || "";
+    document.getElementById("cot-no-incluye").value     = cot.no_incluye     || "";
     actualizarBadgeAprobada(cot.aprobada === "Sí");
-    document.getElementById("body-cot-items").innerHTML = "";
-    (cot.items || []).forEach(i => renderFilaCot(i));
-    actualizarCuadro();
+
+    document.getElementById("cot-adm-pct").value  = parseFloat(cot.administracion_pct) || 0;
+    document.getElementById("cot-imp-pct").value  = parseFloat(cot.imprevistos_pct)    || 0;
+    document.getElementById("cot-util-pct").value = parseFloat(cot.utilidad_pct)       || 0;
+    document.getElementById("cot-iva-pct").value  = parseFloat(cot.iva_pct) > 0 ? parseFloat(cot.iva_pct) : 19;
+
+    document.getElementById("body-cuadro").innerHTML = "";
+    cotItems = {};
+    (cot.items || []).forEach((i, idx) => renderFilaCot(i, idx + 1));
+    recalcularTotalCot();
   }
 
   function limpiarFormCot() {
     ["cot-forma-pago","cot-plazo-entrega","cot-validez-oferta","cot-no-incluye"]
       .forEach(id => document.getElementById(id).value = "");
-    document.getElementById("body-cot-items").innerHTML = "";
     document.getElementById("body-cuadro").innerHTML = "";
-    document.getElementById("cot-total").textContent = COP(0);
+    cotItems = {};
+    document.getElementById("cot-adm-pct").value  = 0;
+    document.getElementById("cot-imp-pct").value  = 0;
+    document.getElementById("cot-util-pct").value = 0;
+    document.getElementById("cot-iva-pct").value  = 19;
+    ["cot-subtotal","cot-cd-val","cot-adm-val","cot-imp-val","cot-util-val","cot-iva-val","cot-total"]
+      .forEach(id => document.getElementById(id).textContent = COP(0));
     actualizarBadgeAprobada(false);
   }
 
@@ -1424,69 +1403,174 @@
     }
   }
 
-  // Fila en la sección "APUs Incluidos"
-  function renderFilaCot(item) {
-    const tbody  = document.getElementById("body-cot-items");
+  // Fila en el cuadro de cotización
+  function renderFilaCot(item, itemNum) {
+    const tbody  = document.getElementById("body-cuadro");
     const id     = item.id;
+    const apuId  = item.apu_id || "";
     const precio = parseFloat(item.precio_apu) || 0;
-    cotItems[id] = { precio };
-    tbody.insertAdjacentHTML("beforeend", `<tr id="crow-${id}">
-      <td class="mono">${item.codigo_item || "—"}</td>
-      <td>${item.descripcion || "—"}</td>
-      <td style="text-align:center">${item.unidad || "—"}</td>
-      <td class="num">${COP(precio)}</td>
-      <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
-    </tr>`);
+    const cant   = parseFloat(item.cantidad)   || 1;
+    const total  = cant * precio;
+    cotItems[id] = { cant, precio, total };
+    tbody.insertAdjacentHTML("beforeend", `
+      <tr id="crow-${id}" class="crow-main">
+        <td style="text-align:center;white-space:nowrap">
+          <button id="btn-tog-${id}" onclick="toggleDetalleCot(${id}, ${apuId})"
+            title="Ver desglose"
+            style="background:none;border:1px solid #90a4ae;color:#546e7a;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 5px;margin-right:4px">▶</button>
+          <span class="crow-num" style="font-weight:700">${itemNum || ""}</span>
+        </td>
+        <td class="mono">${item.codigo_item || "—"}</td>
+        <td>${item.descripcion || "—"}</td>
+        <td style="text-align:center">${item.unidad || "—"}</td>
+        <td><input type="number" class="cell-input" value="${cant}" min="1" style="width:68px"
+            onchange="cambiarCantidadCot('${id}', this.value)"></td>
+        <td class="num">${COP(precio)}</td>
+        <td class="num vp" id="cvp-${id}">${COP(total)}</td>
+        <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
+      </tr>
+      <tr id="detail-${id}" style="display:none;background:#f8f9fa">
+        <td colspan="8" style="padding:0">
+          <div id="detail-body-${id}" style="padding:10px 32px 14px">
+            <span style="color:#888;font-size:12px">Cargando desglose...</span>
+          </div>
+        </td>
+      </tr>`);
+  }
+
+  function toggleDetalleCot(cotItemId, apuId) {
+    const detailRow  = document.getElementById("detail-"      + cotItemId);
+    const detailBody = document.getElementById("detail-body-" + cotItemId);
+    const btn        = document.getElementById("btn-tog-"     + cotItemId);
+    if (!detailRow) return;
+    const visible = detailRow.style.display !== "none";
+    detailRow.style.display = visible ? "none" : "";
+    btn.textContent = visible ? "▶" : "▼";
+    if (!visible && !detailBody.dataset.loaded) {
+      google.script.run
+        .withSuccessHandler(apu => {
+          detailBody.innerHTML   = renderDetalleAPU(apu);
+          detailBody.dataset.loaded = "1";
+        })
+        .withFailureHandler(err => {
+          detailBody.innerHTML = `<span style="color:#c62828;font-size:12px">Error: ${err.message}</span>`;
+        })
+        .getAPUCompleto(apuId);
+    }
+  }
+
+  function renderDetalleAPU(apu) {
+    if (!apu) return "<em style='color:#888;font-size:12px'>APU no encontrado.</em>";
+    const secciones = [
+      { key: "equipos",    label: "EQUIPOS" },
+      { key: "materiales", label: "MATERIALES" },
+      { key: "mano_obra",  label: "MANO DE OBRA" },
+      { key: "otros",      label: "OTROS" },
+    ];
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px">`;
+    let hayAlgo = false;
+    secciones.forEach(sec => {
+      const items = apu[sec.key] || [];
+      if (!items.length) return;
+      hayAlgo = true;
+      html += `<div>
+        <div style="font-size:10px;font-weight:700;color:#1a237e;letter-spacing:.5px;
+                    border-bottom:1px solid #c5cae9;padding-bottom:3px;margin-bottom:4px">${sec.label}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="color:#888">
+              <th style="text-align:left;padding:2px 4px;font-weight:600">Descripción</th>
+              <th style="width:55px;text-align:right;padding:2px 4px;font-weight:600">Cant.</th>
+              <th style="width:55px;text-align:right;padding:2px 4px;font-weight:600">Rend.</th>
+              <th style="width:95px;text-align:right;padding:2px 4px;font-weight:600">P. Unit.</th>
+              <th style="width:95px;text-align:right;padding:2px 4px;font-weight:600">Parcial</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(it => `<tr style="border-top:1px solid #eeeeee">
+              <td style="padding:2px 4px">${it.descripcion_manual || "—"}</td>
+              <td style="text-align:right;padding:2px 4px">${it.cantidad || 0}</td>
+              <td style="text-align:right;padding:2px 4px">${it.rendimiento || "—"}</td>
+              <td style="text-align:right;padding:2px 4px">${COP(it.precio_unitario)}</td>
+              <td style="text-align:right;padding:2px 4px;font-weight:600">${COP(it.valor_parcial)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    });
+    html += `</div>`;
+    if (!hayAlgo) return "<em style='color:#888;font-size:12px'>Este APU no tiene ítems registrados.</em>";
+    return html;
   }
 
   function eliminarFilaCot(id) {
     if (!confirm("¿Eliminar este APU de la cotización?")) return;
-    document.getElementById("crow-" + id)?.remove();
+    document.getElementById("crow-"   + id)?.remove();
+    document.getElementById("detail-" + id)?.remove();
     delete cotItems[id];
-    google.script.run
-      .withSuccessHandler(() => actualizarCuadro())
-      .eliminarItemCotizacion(id);
+    recalcularTotalCot();
+    renumerarFilasCot();
+    google.script.run.eliminarItemCotizacion(id);
   }
 
-  // Cuadro de cotización agrupado por partidas
-  function actualizarCuadro() {
+  function recalcularTotalCot() {
+    const neto    = Object.values(cotItems).reduce((s, i) => s + (i ? (i.total || 0) : 0), 0);
+    const admPct  = parseFloat(document.getElementById("cot-adm-pct").value)  || 0;
+    const impPct  = parseFloat(document.getElementById("cot-imp-pct").value)  || 0;
+    const utilPct = parseFloat(document.getElementById("cot-util-pct").value) || 0;
+    const ivaPct  = parseFloat(document.getElementById("cot-iva-pct").value)  || 0;
+
+    const admVal  = neto * admPct  / 100;
+    const impVal  = neto * impPct  / 100;
+    const utilVal = neto * utilPct / 100;
+    const sinIVA  = neto + admVal + impVal + utilVal;
+    const ivaVal  = sinIVA * ivaPct / 100;
+    const total   = sinIVA + ivaVal;
+
+    document.getElementById("cot-subtotal").textContent = COP(neto);
+    document.getElementById("cot-cd-val").textContent   = COP(neto);
+    document.getElementById("cot-adm-val").textContent  = COP(admVal);
+    document.getElementById("cot-imp-val").textContent  = COP(impVal);
+    document.getElementById("cot-util-val").textContent = COP(utilVal);
+    document.getElementById("cot-iva-val").textContent  = COP(ivaVal);
+    document.getElementById("cot-total").textContent    = COP(total);
+  }
+
+  function guardarAIUCot() {
+    recalcularTotalCot();
     if (!cotActual) return;
-    const tbody = document.getElementById("body-cuadro");
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:12px;color:#888">Calculando...</td></tr>';
-    document.getElementById("btn-actualizar-cuadro").disabled = true;
+    const datos = {
+      administracion_pct: parseFloat(document.getElementById("cot-adm-pct").value)  || 0,
+      imprevistos_pct:    parseFloat(document.getElementById("cot-imp-pct").value)  || 0,
+      utilidad_pct:       parseFloat(document.getElementById("cot-util-pct").value) || 0,
+      iva_pct:            parseFloat(document.getElementById("cot-iva-pct").value)  || 0,
+    };
     google.script.run
-      .withSuccessHandler(partidas => {
-        document.getElementById("btn-actualizar-cuadro").disabled = false;
-        renderCuadro(partidas);
-      })
-      .withFailureHandler(err => {
-        document.getElementById("btn-actualizar-cuadro").disabled = false;
-        tbody.innerHTML = `<tr><td colspan="6" style="color:#c62828;padding:12px">${err.message}</td></tr>`;
-      })
-      .getPartidasCotizacion(cotActual.id);
+      .withFailureHandler(err => console.error("Error guardando AIU:", err.message))
+      .actualizarCotizacion(cotActual.id, datos);
   }
 
-  function renderCuadro(partidas) {
-    const tbody = document.getElementById("body-cuadro");
-    if (!partidas || partidas.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:12px;color:#888">Sin datos — agrega APUs primero.</td></tr>';
-      document.getElementById("cot-total").textContent = COP(0);
-      return;
-    }
-    tbody.innerHTML = partidas.map(p => `<tr>
-      <td style="text-align:center;font-weight:700">${p.item_num}</td>
-      <td style="font-weight:600">${p.partida}</td>
-      <td style="text-align:center">Global</td>
-      <td style="text-align:center">1</td>
-      <td class="num">${COP(p.valor)}</td>
-      <td class="num" style="font-weight:700">${COP(p.valor)}</td>
-    </tr>`).join("");
-    const total = partidas.reduce((s, p) => s + (p.valor || 0), 0);
-    document.getElementById("cot-total").textContent = COP(total);
+  function renumerarFilasCot() {
+    let num = 1;
+    document.querySelectorAll("#body-cuadro tr.crow-main").forEach(row => {
+      const span = row.querySelector(".crow-num");
+      if (span) span.textContent = num++;
+    });
   }
 
-  function recalcularCotUI() {
-    if (cotActual) actualizarCuadro();
+  function cambiarCantidadCot(id, val) {
+    const item = cotItems[id];
+    if (!item) return;
+    const cant = parseFloat(val) || 1;
+    item.cant  = cant;
+    item.total = cant * item.precio;
+    const el = document.getElementById("cvp-" + id);
+    if (el) el.textContent = COP(item.total);
+    recalcularTotalCot();
+    clearTimeout(window["cant_" + id]);
+    window["cant_" + id] = setTimeout(() => {
+      google.script.run.actualizarCantidadItem(id, cant);
+    }, 800);
   }
 
     function toggleAprobada() {
@@ -1559,18 +1643,19 @@
     const cant = parseFloat(cantStr);
     if (isNaN(cant) || cant <= 0) return;
 
-    const apu    = todosLosAPUs.find(a => a.id == apuId) || {};
-    const precio = parseFloat(apu.costo_neto) || 0;
-    const tempId = "t" + Date.now();
-    const item   = {
-      id: tempId,
+    const apu      = todosLosAPUs.find(a => a.id == apuId) || {};
+    const precio   = parseFloat(apu.costo_neto) || 0;
+    const tempId   = "t" + Date.now();
+    const itemNum  = Object.keys(cotItems).length + 1;
+    const item     = {
+      id:          tempId,
       codigo_item: apu.codigo_item || "",
       descripcion: apu.descripcion || apu.codigo_item || "",
       unidad:      apu.unidad || "",
       precio_apu:  precio,
+      cantidad:    cant,
     };
-    cotItems[tempId] = { precio };
-    renderFilaCot(item);
+    renderFilaCot(item, itemNum);
 
     const esElPrimero = Object.keys(cotItems).length === 1;
     google.script.run
@@ -1579,7 +1664,6 @@
         if (esElPrimero && apu.cliente) {
           google.script.run.actualizarCotizacion(cotActual.id, { cliente: apu.cliente });
         }
-        actualizarCuadro();
       })
       .withFailureHandler(err => alert("Error: " + err.message))
       .agregarAPUaCotizacion(cotActual.id, apuId, cant);
@@ -1589,43 +1673,32 @@
     const row = document.getElementById("crow-" + tempId);
     if (row) {
       row.id = "crow-" + realId;
-      row.querySelectorAll("[onclick]").forEach(el => {
-        const v = el.getAttribute("onclick");
-        if (v) el.setAttribute("onclick", v.replace(new RegExp(tempId, "g"), realId));
+      row.querySelectorAll("[onclick],[onchange]").forEach(el => {
+        ["onclick","onchange"].forEach(attr => {
+          const v = el.getAttribute(attr);
+          if (v) el.setAttribute(attr, v.replace(new RegExp(tempId, "g"), realId));
+        });
       });
+      const cvpEl  = document.getElementById("cvp-"     + tempId);
+      if (cvpEl)  cvpEl.id  = "cvp-"     + realId;
+      const btnTog = document.getElementById("btn-tog-" + tempId);
+      if (btnTog) btnTog.id = "btn-tog-" + realId;
     }
-    cotItems[realId] = cotItems[tempId];
-    delete cotItems[tempId];
+    const detailRow = document.getElementById("detail-" + tempId);
+    if (detailRow) {
+      detailRow.id = "detail-" + realId;
+      const detailBody = document.getElementById("detail-body-" + tempId);
+      if (detailBody) detailBody.id = "detail-body-" + realId;
+    }
+    if (tempId in cotItems) {
+      cotItems[realId] = cotItems[tempId];
+      delete cotItems[tempId];
+    }
   }
 
   function cerrarModalAPU(e) {
     if (!e || e.target.id === "modal-apu")
       document.getElementById("modal-apu").style.display = "none";
-  }
-
-  function exportarPDF() {
-    if (!cotActual) { alert("Guarda la cotización primero."); return; }
-    const btn = document.getElementById("btn-pdf");
-    btn.textContent = "Generando...";
-    btn.disabled    = true;
-    setCotEstado("Generando PDF...");
-    google.script.run
-      .withSuccessHandler(res => {
-        btn.textContent = "Exportar PDF";
-        btn.disabled    = false;
-        if (res.ok) {
-          setCotEstado("PDF guardado ✓  — " + res.nombre);
-          window.open(res.url, "_blank");
-        } else {
-          setCotEstado("Error: " + res.error);
-        }
-      })
-      .withFailureHandler(err => {
-        btn.textContent = "Exportar PDF";
-        btn.disabled    = false;
-        setCotEstado("Error: " + err.message);
-      })
-      .exportarCotizacionPDF(cotActual.id);
   }
 
   function setCotEstado(msg) { document.getElementById("cot-estado").textContent = msg; }
@@ -1648,7 +1721,7 @@
       .eliminarCotizacion(id);
   }
 
-  // ═══ ENVIAR COTIZACIÓN POR CORREO ═════════════════════════════════════════
+  // ═══ ENVIAR COTIZACIÓN + GUARDAR PDF EN DRIVE ════════════════════════════
   function enviarPorCorreo() {
     if (!cotActual) { alert("Guarda la cotización primero."); return; }
     const email = prompt("Correo electrónico del cliente:");
@@ -1656,28 +1729,270 @@
     const btn = document.getElementById("btn-email");
     btn.textContent = "Enviando...";
     btn.disabled    = true;
-    setCotEstado("Enviando correo...");
+    setCotEstado("Generando PDF y enviando correo...");
     google.script.run
       .withSuccessHandler(res => {
-        btn.textContent = "Enviar →";
+        btn.textContent = "Enviar y guardar PDF →";
         btn.disabled    = false;
         if (res.ok) {
-          setCotEstado("Correo enviado ✓");
+          setCotEstado("PDF guardado en Drive ✓  |  Correo enviado ✓  —  " + res.nombre);
         } else {
           setCotEstado("Error: " + res.error);
-          alert("Error enviando correo: " + res.error);
+          alert("Error: " + res.error);
         }
       })
       .withFailureHandler(err => {
-        btn.textContent = "Enviar →";
+        btn.textContent = "Enviar y guardar PDF →";
         btn.disabled    = false;
         setCotEstado("Error: " + err.message);
         alert("Error: " + err.message);
       })
-      .enviarCotizacionEmail(cotActual.id, email);
+      .enviarYGuardarPDF(cotActual.id, email);
   }
 
   window.onload = init;
+
+  // ═══ GESTIÓN BD DE PRECIOS ════════════════════════════════════════════════════
+
+  let bdTabActual = "MAT";
+  let bdDatos     = [];
+  let bdEditId    = null;   // null = nuevo, id numérico = editar
+
+  function abrirGestionarBD() {
+    document.getElementById("modal-bd").style.display = "flex";
+    bdCambiarTab("MAT");
+  }
+
+  function cerrarModalBD(e) {
+    if (!e || e.target.id === "modal-bd")
+      document.getElementById("modal-bd").style.display = "none";
+  }
+
+  function bdCambiarTab(tab) {
+    bdTabActual = tab;
+    ["MAT","MO","EQ"].forEach(t => {
+      const btn = document.getElementById("bd-tab-" + t);
+      if (t === tab) {
+        btn.style.background   = "#1a237e";
+        btn.style.color        = "#fff";
+        btn.style.borderColor  = "#1a237e";
+        btn.style.fontWeight   = "700";
+      } else {
+        btn.style.background   = "#fff";
+        btn.style.color        = "#555";
+        btn.style.borderColor  = "#ccc";
+        btn.style.fontWeight   = "500";
+      }
+    });
+    cancelarFormBD();
+    document.getElementById("bd-search").value = "";
+    bdCargar();
+  }
+
+  function bdCargar() {
+    document.getElementById("bd-tbody").innerHTML =
+      '<tr><td colspan="10" style="text-align:center;padding:24px;color:#888">Cargando...</td></tr>';
+    document.getElementById("bd-count").textContent = "";
+    const fn = { MAT: "cargarMaterialesBD", MO: "cargarManoObra", EQ: "cargarEquipos" }[bdTabActual];
+    google.script.run
+      .withSuccessHandler(data => {
+        bdDatos = data || [];
+        bdRenderHeader();
+        filtrarBD();
+      })
+      .withFailureHandler(err => {
+        document.getElementById("bd-tbody").innerHTML =
+          `<tr><td colspan="10" style="color:#c62828;padding:16px">Error: ${err.message}</td></tr>`;
+      })
+      [fn]();
+  }
+
+  function bdRenderHeader() {
+    const cols = {
+      MAT: ["CÓDIGO","CATEGORÍA","NOMBRE","UND","PRECIO SIN IVA","PROVEEDOR","",""],
+      MO:  ["DESCRIPCIÓN","SALARIO MENSUAL","PREST. %","COSTO/DÍA","",""],
+      EQ:  ["NOMBRE","TARIFA/DÍA","",""],
+    };
+    document.getElementById("bd-thead").innerHTML =
+      "<tr>" + (cols[bdTabActual] || []).map(h => `<th>${h}</th>`).join("") + "</tr>";
+  }
+
+  function filtrarBD() {
+    const q = (document.getElementById("bd-search").value || "").toLowerCase().trim();
+    const items = !q ? bdDatos : bdDatos.filter(item => {
+      const txt = bdTabActual === "MAT"
+        ? (item.nombre + " " + (item.codigo || "") + " " + (item.categoria || ""))
+        : bdTabActual === "MO" ? (item.descripcion || "")
+        : (item.nombre || "");
+      return txt.toLowerCase().includes(q);
+    });
+    document.getElementById("bd-count").textContent = items.length + " / " + bdDatos.length + " registros";
+    bdRenderFilas(items);
+  }
+
+  function bdRenderFilas(items) {
+    const tbody = document.getElementById("bd-tbody");
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:#888">Sin resultados</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = items.map(item => {
+      const id     = item.id;
+      const nombre = (bdTabActual === "MO" ? item.descripcion : item.nombre) || "";
+      const esc    = nombre.replace(/'/g, "\\'");
+      const tipo   = { MAT: "MATERIAL", MO: "MANO_OBRA", EQ: "EQUIPO" }[bdTabActual];
+      const acciones = `
+        <td><button class="btn-sel" onclick="mostrarFormBD(${id})"
+              style="background:#1565c0;padding:3px 10px;font-size:11px">✏ Editar</button></td>
+        <td><button class="btn-del" onclick="eliminarRecursoBD('${tipo}',${id},'${esc}')">✕</button></td>`;
+
+      if (bdTabActual === "MAT") return `<tr>
+        <td class="mono">${item.codigo || "—"}</td>
+        <td><span class="badge">${item.categoria || "—"}</span></td>
+        <td>${item.nombre}</td>
+        <td>${item.unidad || "—"}</td>
+        <td class="num">${COP(item.precio_sin_iva)}</td>
+        <td style="color:#777;font-size:11px">${item.proveedor || "—"}</td>
+        ${acciones}
+      </tr>`;
+
+      if (bdTabActual === "MO") return `<tr>
+        <td>${item.descripcion}</td>
+        <td class="num">${COP(item.salario_mensual)}</td>
+        <td style="text-align:center">${item.prestaciones_pct || 54}%</td>
+        <td class="num">${COP(item.costo_dia)}</td>
+        ${acciones}
+      </tr>`;
+
+      if (bdTabActual === "EQ") return `<tr>
+        <td>${item.nombre}</td>
+        <td class="num">${COP(item.tarifa_dia)}</td>
+        ${acciones}
+      </tr>`;
+    }).join("");
+  }
+
+  function mostrarFormBD(id) {
+    bdEditId = id;
+    const panel  = document.getElementById("bd-form");
+    const fields = document.getElementById("bd-form-fields");
+    const titulo = document.getElementById("bd-form-titulo");
+    document.getElementById("bd-form-estado").textContent = "";
+    panel.style.display = "";
+
+    const item = (id !== null && id !== undefined)
+      ? (bdDatos.find(x => x.id == id) || {})
+      : {};
+    titulo.textContent = (id !== null && id !== undefined) ? "EDITAR REGISTRO" : "NUEVO REGISTRO";
+
+    // Cateogrías únicas para datalist
+    const cats = [...new Set(bdDatos.map(m => m.categoria).filter(Boolean))].sort();
+    const catList = `<datalist id="bd-cats">${cats.map(c => `<option value="${c}">`).join("")}</datalist>`;
+
+    const inp = (id_, label, val, opts = "") =>
+      `<div class="form-group">
+        <label>${label}</label>
+        <input id="${id_}" ${opts} value="${String(val ?? '').replace(/"/g,'&quot;')}"
+               style="width:100%;border:1px solid #c5cae9;border-radius:4px;padding:6px 8px;font-size:12px;outline:none">
+       </div>`;
+
+    if (bdTabActual === "MAT") {
+      fields.innerHTML = catList
+        + `<div style="display:grid;grid-template-columns:90px 180px 1fr 70px 130px 140px;gap:10px;width:100%">`
+        + inp("bd-f-codigo",    "CÓDIGO",        item.codigo    || "")
+        + inp("bd-f-categoria", "CATEGORÍA",     item.categoria || "", 'list="bd-cats"')
+        + inp("bd-f-nombre",    "NOMBRE",        item.nombre    || "")
+        + inp("bd-f-unidad",    "UNIDAD",        item.unidad    || "")
+        + inp("bd-f-precio",    "PRECIO SIN IVA",item.precio_sin_iva || 0, 'type="number" min="0"')
+        + inp("bd-f-proveedor", "PROVEEDOR",     item.proveedor || "")
+        + `</div>`;
+
+    } else if (bdTabActual === "MO") {
+      fields.innerHTML =
+        `<div style="display:grid;grid-template-columns:1fr 180px 130px;gap:10px;width:100%">`
+        + inp("bd-f-descripcion", "DESCRIPCIÓN",       item.descripcion     || "")
+        + inp("bd-f-salario",     "SALARIO MENSUAL",   item.salario_mensual || 0,    'type="number" min="0"')
+        + inp("bd-f-prest",       "PRESTACIONES %",    item.prestaciones_pct || 54, 'type="number" min="0" max="200"')
+        + `</div>`;
+
+    } else if (bdTabActual === "EQ") {
+      const partOpts = ["Mano de Obra e Instalación","Transporte y Logística","Suministro Unidades Exteriores","Suministro Unidades Interiores","Otros"]
+        .map(p => `<option value="${p}" ${(item.partida||"Mano de Obra e Instalación")===p?"selected":""}>${p}</option>`).join("");
+      fields.innerHTML =
+        `<div style="display:grid;grid-template-columns:1fr 180px 260px;gap:10px;width:100%">`
+        + inp("bd-f-nombre",  "NOMBRE",     item.nombre     || "")
+        + inp("bd-f-tarifa",  "TARIFA/DÍA", item.tarifa_dia || 0, 'type="number" min="0"')
+        + `<div class="form-group"><label>PARTIDA (excepción)</label>
+             <select id="bd-f-partida" style="width:100%;border:1px solid #c5cae9;border-radius:4px;padding:6px 8px;font-size:12px">
+               ${partOpts}
+             </select></div>`
+        + `</div>`;
+    }
+
+    setTimeout(() => { const f = fields.querySelector("input"); if (f) f.focus(); }, 60);
+  }
+
+  function cancelarFormBD() {
+    bdEditId = null;
+    document.getElementById("bd-form").style.display  = "none";
+    document.getElementById("bd-form-fields").innerHTML = "";
+  }
+
+  function guardarRecursoBD() {
+    const estado = document.getElementById("bd-form-estado");
+    estado.textContent = "Guardando...";
+    let tipo, datos;
+
+    if (bdTabActual === "MAT") {
+      tipo  = "MATERIAL";
+      datos = {
+        codigo:        (document.getElementById("bd-f-codigo").value    || "").trim(),
+        categoria:     (document.getElementById("bd-f-categoria").value || "").trim(),
+        nombre:        (document.getElementById("bd-f-nombre").value    || "").trim(),
+        unidad:        (document.getElementById("bd-f-unidad").value    || "").trim(),
+        precio_sin_iva: parseFloat(document.getElementById("bd-f-precio").value)    || 0,
+        proveedor:     (document.getElementById("bd-f-proveedor").value || "").trim(),
+      };
+      if (!datos.nombre) { estado.textContent = "El nombre es obligatorio."; return; }
+
+    } else if (bdTabActual === "MO") {
+      tipo  = "MANO_OBRA";
+      datos = {
+        descripcion:      (document.getElementById("bd-f-descripcion").value || "").trim(),
+        salario_mensual:   parseFloat(document.getElementById("bd-f-salario").value) || 0,
+        prestaciones_pct:  parseFloat(document.getElementById("bd-f-prest").value)   || 54,
+      };
+      if (!datos.descripcion) { estado.textContent = "La descripción es obligatoria."; return; }
+
+    } else if (bdTabActual === "EQ") {
+      tipo  = "EQUIPO";
+      datos = {
+        nombre:     (document.getElementById("bd-f-nombre").value   || "").trim(),
+        tarifa_dia:  parseFloat(document.getElementById("bd-f-tarifa").value) || 0,
+        partida:    document.getElementById("bd-f-partida").value || "Mano de Obra e Instalación",
+      };
+      if (!datos.nombre) { estado.textContent = "El nombre es obligatorio."; return; }
+    }
+
+    const ok   = () => { estado.textContent = "✓ Guardado"; cancelarFormBD(); bdCargar(); };
+    const fail = err => { estado.textContent = "Error: " + err.message; };
+
+    if (bdEditId !== null && bdEditId !== undefined) {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(fail)
+        .actualizarRecurso(tipo, bdEditId, datos);
+    } else {
+      google.script.run.withSuccessHandler(ok).withFailureHandler(fail)
+        .crearRecurso(tipo, datos);
+    }
+  }
+
+  function eliminarRecursoBD(tipo, id, nombre) {
+    if (!confirm('¿Eliminar "' + nombre + '"?\nEsta acción no se puede deshacer.')) return;
+    google.script.run
+      .withSuccessHandler(() => bdCargar())
+      .withFailureHandler(err => alert("Error: " + err.message))
+      .eliminarRecurso(tipo, id);
+  }
 
   // ═══ FIRMA DIGITAL ════════════════════════════════════════════════════════════
   (function () {

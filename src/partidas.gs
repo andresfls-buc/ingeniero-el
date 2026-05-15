@@ -14,14 +14,23 @@ const PARTIDAS_FIJAS = [
 
 // Mapeo: categoria de Materiales → partida
 const CAT_A_PARTIDA = {
-  "Accesorio CU":        "Accesorios para Redes de Refrigeración - Sistemas SRV",
-  "Tub CU Flex ACR":     "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
-  "Tub CU Rig K":        "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
-  "Tub CU Rig L":        "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
-  "Tub Acero":           "Redes de Distribución de Gas",
-  "Aislamiento":         "Aislamiento Térmico",
-  "Tub Galvanizada Gas": "Redes de Distribución de Gas",
-  "Tub PE-AL-PE Gas":    "Redes de Distribución de Gas",
+  "Accesorio CU":              "Accesorios para Redes de Refrigeración - Sistemas SRV",
+  "Tub CU Flex ACR":           "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
+  "Tub CU Rig K":              "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
+  "Tub CU Rig L":              "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
+  "Tub Acero":                 "Redes de Distribución de Gas",
+  "Tub Acero CED 40":          "Redes de Distribución de Gas",
+  "Tub Acero CED 10":          "Redes de Distribución de Gas",
+  "Aislamiento":               "Aislamiento Térmico",
+  "Cinta Foam":                "Aislamiento Térmico",
+  "Tub Galvanizada Gas":       "Redes de Distribución de Gas",
+  "Tub PE-AL-PE Gas":          "Redes de Distribución de Gas",
+  "Tub PP Pre-Aislada":        "Tuberías de Refrigeración y Refrigerantes - Sistemas SRV",
+  "Accesorio PP":              "Accesorios para Redes de Refrigeración - Sistemas SRV",
+  "Válvulas":                  "Otros",
+  "Materiales Civiles":        "Otros",
+  "Materiales Eléctricos":     "Otros",
+  "Materiales Aire Acond.":    "Otros",
 };
 
 function getPartidas() {
@@ -70,16 +79,17 @@ function getPartidaRecurso(ss, tipo, recursoId) {
 
   if (tipo === "EQUIPO") {
     const sheet = ss.getSheetByName("Equipos");
-    if (!sheet) return "Suministro Unidades Exteriores";
+    if (!sheet) return "Mano de Obra e Instalación";
     const data   = sheet.getDataRange().getValues();
     const h      = data[0];
     const idIdx  = h.indexOf("id");
     const parIdx = h.indexOf("partida");
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]) === String(recursoId)) {
-        return (parIdx >= 0 && data[i][parIdx]) ? String(data[i][parIdx]) : "Suministro Unidades Exteriores";
+        return (parIdx >= 0 && data[i][parIdx]) ? String(data[i][parIdx]) : "Mano de Obra e Instalación";
       }
     }
+    return "Mano de Obra e Instalación";
   }
 
   return "Otros";

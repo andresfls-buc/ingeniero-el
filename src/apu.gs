@@ -340,11 +340,11 @@ function actualizarPrecioRecurso(tipo, id, nuevoPrecio) {
 // Equipos:   (a × b) / c  = (cant × tarifa_dia) / rendimiento
 // Materiales: d × e        = precio × cantidad
 // Mano obra: (f × g) / h  = (cant × costo_dia) / rendimiento
-// Otros:      i / j        = valor_total / cantidad_unidades
+// Otros:      i × j        = costo_unitario × cantidad
 function calcularValorParcial(tipo, cant, precio, rend) {
   if (tipo === "EQUIPO"   || tipo === "MANO_OBRA") return rend > 0 ? (cant * precio) / rend : 0;
   if (tipo === "MATERIAL")                          return cant * precio;
-  if (tipo === "OTRO")                              return cant > 0 ? precio / cant : 0;
+  if (tipo === "OTRO")                              return precio * cant;
   return 0;
 }
 

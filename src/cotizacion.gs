@@ -553,6 +553,101 @@ function enviarCotizacionEmail(cotId, emailDestino) {
   }
 }
 
+// ─── ENVIAR EMAIL + GUARDAR PDF EN DRIVE (una sola operación) ────────────────
+
+function enviarYGuardarPDF(cotId, emailDestino) {
+  try {
+    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    const cot = getCotizacionCompleta(cotId);
+    if (!cot) return { ok: false, error: "Cotización no encontrada" };
+
+    // Generar PDF una sola vez
+    const tmpName = "_cot_enviar_tmp_";
+    let tmp = ss.getSheetByName(tmpName);
+    if (tmp) ss.deleteSheet(tmp);
+    tmp = ss.insertSheet(tmpName);
+    llenarHojaCotizacion(tmp, cot);
+    SpreadsheetApp.flush();
+
+    const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
+      + "/export?format=pdf&gid=" + tmp.getSheetId()
+      + "&portrait=true&fitw=true&size=letter"
+      + "&gridlines=false&printtitle=false&sheetnames=false"
+      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+
+    const pdfBlob = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
+    }).getBlob();
+
+    ss.deleteSheet(tmp);
+
+    // Nombre del archivo
+    const now   = new Date();
+    const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const dia   = String(now.getDate()).padStart(2, "0");
+    const mes   = meses[now.getMonth()];
+    const anio  = now.getFullYear();
+    const hora  = String(now.getHours()).padStart(2, "0");
+    const min   = String(now.getMinutes()).padStart(2, "0");
+    const slug  = (cot.cliente || "sin_cliente")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
+    const fileName = `${dia}-${mes}-${anio}_${hora}-${min}_${slug}.pdf`;
+
+    // Guardar en Drive
+    const folder   = obtenerCarpetaPDF();
+    const driveFile = folder.createFile(pdfBlob.setName(fileName));
+
+    // Preparar y enviar correo con el mismo blob (clonar para no perder el nombre)
+    const cfg     = getConfig();
+    const nombre  = (cfg["nombre_remitente"] || "").trim() || Session.getActiveUser().getEmail();
+    const empresa = (cfg["empresa"] || "").trim();
+
+    const total    = Math.round(parseFloat(cot.valor_total) || 0);
+    const totalFmt = "$" + total.toLocaleString("es-CO");
+    const firma    = empresa ? nombre + "\n" + empresa : nombre;
+    const asunto   = (cot.numero_oferta || "Cotización") + " - " + (cot.cliente || "");
+
+    const textPlano = "Estimado/a cliente,\n\n"
+      + "Le hago llegar la cotización " + (cot.numero_oferta || "") + " solicitada.\n"
+      + "Valor total: " + totalFmt + "\n\n"
+      + "El documento se encuentra adjunto a este correo.\n\n"
+      + "Quedo atento a sus comentarios.\n\n" + firma;
+
+    const firmaHtml = empresa
+      ? '<strong>' + nombre + '</strong><br><span style="color:#666">' + empresa + '</span>'
+      : '<strong>' + nombre + '</strong>';
+
+    const htmlBody = '<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#222">'
+      + '<p>Estimado/a cliente,</p>'
+      + '<p>Le hago llegar la cotización <strong>' + (cot.numero_oferta || "") + '</strong> solicitada.</p>'
+      + '<table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px">'
+      + '<tr style="background:#f0f2f5"><td style="padding:10px 14px;border:1px solid #ddd;color:#555;width:130px">N° Oferta</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd;font-weight:600">' + (cot.numero_oferta || "—") + '</td></tr>'
+      + '<tr><td style="padding:10px 14px;border:1px solid #ddd;color:#555">Cliente</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd">' + (cot.cliente || "—") + '</td></tr>'
+      + '<tr style="background:#f0f2f5"><td style="padding:10px 14px;border:1px solid #ddd;color:#555">Valor Total</td>'
+      + '<td style="padding:10px 14px;border:1px solid #ddd;font-weight:700;color:#1a237e">' + totalFmt + '</td></tr>'
+      + '</table>'
+      + '<p>El documento se encuentra adjunto a este correo.</p>'
+      + '<p>Quedo atento a sus comentarios.</p>'
+      + '<br><p style="margin:0">' + firmaHtml + '</p>'
+      + '</div>';
+
+    // Usar DriveFile como adjunto (evita clonar el blob)
+    GmailApp.sendEmail(emailDestino, asunto, textPlano, {
+      name:        nombre,
+      replyTo:     Session.getActiveUser().getEmail(),
+      attachments: [driveFile.getBlob().setName(fileName).setContentType("application/pdf")],
+      htmlBody,
+    });
+
+    return { ok: true, nombre: fileName, url: driveFile.getUrl() };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 // ─── GUARDAR FIRMA DIGITAL ────────────────────────────────────────────────────
 
 function guardarFirmaDigital(base64Png) {
@@ -617,8 +712,10 @@ function recalcularCotizacion(ss, cotId) {
       const imprev = parseFloat(cotData[i][cotH.indexOf("imprevistos_pct")])    || 0;
       const util   = parseFloat(cotData[i][cotH.indexOf("utilidad_pct")])       || 0;
       const iva    = parseFloat(cotData[i][cotH.indexOf("iva_pct")])            || 0;
-      cotSheet.getRange(i + 1, cotH.indexOf("valor_neto")  + 1).setValue(valorNeto);
-      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(valorNeto);
+      const sinIVA     = valorNeto * (1 + admin/100 + imprev/100 + util/100);
+      const valorTotal = Math.round(sinIVA * (1 + iva/100));
+      cotSheet.getRange(i + 1, cotH.indexOf("valor_neto")  + 1).setValue(Math.round(valorNeto));
+      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(valorTotal);
       break;
     }
   }
