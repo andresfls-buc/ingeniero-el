@@ -330,7 +330,7 @@
     <button class="btn btn-back" onclick="irTabAPUs()">← Volver</button>
     <h2 id="apu-titulo">Nuevo APU</h2>
     <span class="estado-tag" id="apu-estado"></span>
-    <button class="btn btn-primary" onclick="guardarAPUManual()" style="margin-left:auto">Guardar APU</button>
+    <button class="btn btn-primary" id="btn-guardar-apu" onclick="guardarAPUManual()" style="margin-left:auto">Guardar APU</button>
   </div>
 
   <div class="container">
@@ -460,7 +460,10 @@
       </div>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;padding:12px 0 4px">
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 0 4px">
+      <button class="btn" id="btn-dl-apu" onclick="descargarAPU()" style="background:#e65100;color:#fff;font-size:14px;padding:10px 22px;border:none;border-radius:4px;cursor:pointer">
+        ⬇ Descargar APU
+      </button>
       <button class="btn btn-primary" onclick="crearCotizacionDesdeAPU()" style="background:#2e7d32;color:#fff;font-size:14px;padding:10px 22px">
         Crear Cotización con este APU →
       </button>
@@ -541,6 +544,21 @@
       </div>
     </div>
 
+    <!-- DATOS DEL CLIENTE -->
+    <div class="card sec-general">
+      <div class="sec-header"><span>DATOS DEL CLIENTE</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>CLIENTE / OBRA</label>
+          <input id="cot-cliente" type="text" placeholder="Nombre del cliente o proyecto" onblur="guardarCabezaCot()">
+        </div>
+        <div class="form-group">
+          <label>DIRECCIÓN</label>
+          <input id="cot-direccion" type="text" placeholder="Dirección del proyecto" onblur="guardarCabezaCot()">
+        </div>
+      </div>
+    </div>
+
     <!-- CONDICIONES COMERCIALES -->
     <div class="card sec-general">
       <div class="sec-header"><span>CONDICIONES COMERCIALES</span></div>
@@ -587,7 +605,10 @@
       <span id="badge-aprobada" class="badge badge-no">Pendiente</span>
     </div>
 
-    <div style="display:flex;justify-content:flex-end;padding:12px 0 4px">
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 0 4px">
+      <button class="btn" id="btn-pdf" onclick="descargarPDF()" style="background:#e65100;color:#fff;font-size:14px;padding:10px 22px;border:none;border-radius:4px;cursor:pointer">
+        ⬇ Descargar PDF
+      </button>
       <button class="btn btn-primary" id="btn-email" onclick="enviarPorCorreo()" style="background:#1565c0;color:#fff;font-size:14px;padding:10px 22px">
         Enviar y guardar PDF →
       </button>
@@ -839,7 +860,73 @@
   }
 
   function guardarAPUManual() {
-    asegurarAPUluego(() => guardarCabeza());
+    const btn = document.getElementById("btn-guardar-apu");
+    asegurarAPUluego(() => {
+      if (!apuActual) return;
+      if (btn) { btn.textContent = "Guardando..."; btn.disabled = true; }
+      const datos = {
+        codigo_item: document.getElementById("f-item").value,
+        descripcion: document.getElementById("f-item").value,
+        unidad:      document.getElementById("f-unidad").value,
+        cliente:     document.getElementById("f-cliente").value,
+        direccion:   document.getElementById("f-direccion").value || "",
+        actividad:   document.getElementById("f-actividad").value,
+      };
+      // Paso 1: guardar datos en Sheets
+      google.script.run
+        .withSuccessHandler(() => {
+          // Paso 2: exportar PDF a Drive sólo cuando Sheets confirmó
+          setEstado("Subiendo PDF a Drive...");
+          google.script.run
+            .withSuccessHandler(res => {
+              if (btn) { btn.textContent = "Guardar APU"; btn.disabled = false; }
+              if (res && !res.ok) {
+                setEstado("⚠ Error Drive: " + res.error);
+                alert("No se pudo guardar en Drive:\n" + res.error);
+              } else {
+                setEstado("Guardado en Drive ✓  —  " + (res.fileName || ""));
+              }
+            })
+            .withFailureHandler(err => {
+              if (btn) { btn.textContent = "Guardar APU"; btn.disabled = false; }
+              const msg = (err && err.message) ? err.message : String(err);
+              setEstado("⚠ Error Drive: " + msg);
+              alert("Error al guardar en Drive:\n" + msg);
+            })
+            .exportarAPUaDrive(apuActual);
+        })
+        .withFailureHandler(err => {
+          if (btn) { btn.textContent = "Guardar APU"; btn.disabled = false; }
+          setEstado("Error al guardar: " + (err.message || err));
+        })
+        .actualizarCabezaAPU(apuActual, datos);
+    });
+  }
+
+  function descargarAPU() {
+    if (!apuActual) { alert("Guarda el APU primero."); return; }
+    const btn = document.getElementById("btn-dl-apu");
+    btn.textContent = "Generando...";
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(res => {
+        btn.textContent = "⬇ Descargar APU";
+        btn.disabled = false;
+        if (!res.ok) { alert("Error generando PDF: " + res.error); return; }
+        const blob = b64toBlob(res.base64, "application/pdf");
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = res.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .withFailureHandler(err => {
+        btn.textContent = "⬇ Descargar APU";
+        btn.disabled = false;
+        alert("Error: " + err.message);
+      })
+      .descargarAPUBase64(apuActual);
   }
 
   function crearCotizacionDesdeAPU() {
@@ -1348,6 +1435,8 @@
 
   function renderCotizacion(cot) {
     document.getElementById("cot-titulo").textContent   = cot.numero_oferta || "Cotización";
+    document.getElementById("cot-cliente").value        = cot.cliente        || "";
+    document.getElementById("cot-direccion").value      = cot.direccion      || "";
     document.getElementById("cot-forma-pago").value     = cot.forma_pago     || "";
     document.getElementById("cot-plazo-entrega").value  = cot.plazo_entrega  || "";
     document.getElementById("cot-validez-oferta").value = cot.validez_oferta || "";
@@ -1366,7 +1455,7 @@
   }
 
   function limpiarFormCot() {
-    ["cot-forma-pago","cot-plazo-entrega","cot-validez-oferta","cot-no-incluye"]
+    ["cot-cliente","cot-direccion","cot-forma-pago","cot-plazo-entrega","cot-validez-oferta","cot-no-incluye"]
       .forEach(id => document.getElementById(id).value = "");
     document.getElementById("body-cuadro").innerHTML = "";
     cotItems = {};
@@ -1381,6 +1470,8 @@
 
   function guardarCabezaCot() {
     const datos = {
+      cliente:            document.getElementById("cot-cliente").value,
+      direccion:          document.getElementById("cot-direccion").value,
       forma_pago:         document.getElementById("cot-forma-pago").value,
       plazo_entrega:      document.getElementById("cot-plazo-entrega").value,
       validez_oferta:     document.getElementById("cot-validez-oferta").value,
@@ -1403,110 +1494,77 @@
     }
   }
 
-  // Fila en el cuadro de cotización
+  // Fila en el cuadro de cotización (con sub-ítems inline)
   function renderFilaCot(item, itemNum) {
     const tbody  = document.getElementById("body-cuadro");
     const id     = item.id;
-    const apuId  = item.apu_id || "";
     const precio = parseFloat(item.precio_apu) || 0;
     const cant   = parseFloat(item.cantidad)   || 1;
     const total  = cant * precio;
     cotItems[id] = { cant, precio, total };
-    tbody.insertAdjacentHTML("beforeend", `
-      <tr id="crow-${id}" class="crow-main">
-        <td style="text-align:center;white-space:nowrap">
-          <button id="btn-tog-${id}" onclick="toggleDetalleCot(${id}, ${apuId})"
-            title="Ver desglose"
-            style="background:none;border:1px solid #90a4ae;color:#546e7a;border-radius:3px;cursor:pointer;font-size:10px;padding:1px 5px;margin-right:4px">▶</button>
-          <span class="crow-num" style="font-weight:700">${itemNum || ""}</span>
-        </td>
-        <td class="mono">${item.codigo_item || "—"}</td>
-        <td>${item.descripcion || "—"}</td>
-        <td style="text-align:center">${item.unidad || "—"}</td>
-        <td><input type="number" class="cell-input" value="${cant}" min="1" style="width:68px"
-            onchange="cambiarCantidadCot('${id}', this.value)"></td>
-        <td class="num">${COP(precio)}</td>
-        <td class="num vp" id="cvp-${id}">${COP(total)}</td>
-        <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
-      </tr>
-      <tr id="detail-${id}" style="display:none;background:#f8f9fa">
-        <td colspan="8" style="padding:0">
-          <div id="detail-body-${id}" style="padding:10px 32px 14px">
-            <span style="color:#888;font-size:12px">Cargando desglose...</span>
-          </div>
-        </td>
-      </tr>`);
+
+    let html = `<tr id="crow-${id}" class="crow-main" data-cotitem-id="${id}" style="background:#e3f2fd">
+      <td style="text-align:center;font-weight:700;color:#1a237e"><span class="crow-num">${itemNum || ""}</span></td>
+      <td class="mono" style="font-size:11px">${item.codigo_item || "—"}</td>
+      <td style="font-weight:600">${item.descripcion || "—"}</td>
+      <td style="text-align:center">${item.unidad || "—"}</td>
+      <td><input type="number" class="cell-input" value="${cant}" min="1" style="width:68px"
+          onchange="cambiarCantidadCot('${id}', this.value)"></td>
+      <td class="num">${COP(precio)}</td>
+      <td class="num vp" id="cvp-${id}" style="font-weight:700">${COP(total)}</td>
+      <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
+    </tr>`;
+
+    html += renderSubitemsHTML(id, item);
+    tbody.insertAdjacentHTML("beforeend", html);
   }
 
-  function toggleDetalleCot(cotItemId, apuId) {
-    const detailRow  = document.getElementById("detail-"      + cotItemId);
-    const detailBody = document.getElementById("detail-body-" + cotItemId);
-    const btn        = document.getElementById("btn-tog-"     + cotItemId);
-    if (!detailRow) return;
-    const visible = detailRow.style.display !== "none";
-    detailRow.style.display = visible ? "none" : "";
-    btn.textContent = visible ? "▶" : "▼";
-    if (!visible && !detailBody.dataset.loaded) {
-      google.script.run
-        .withSuccessHandler(apu => {
-          detailBody.innerHTML   = renderDetalleAPU(apu);
-          detailBody.dataset.loaded = "1";
-        })
-        .withFailureHandler(err => {
-          detailBody.innerHTML = `<span style="color:#c62828;font-size:12px">Error: ${err.message}</span>`;
-        })
-        .getAPUCompleto(apuId);
-    }
-  }
-
-  function renderDetalleAPU(apu) {
-    if (!apu) return "<em style='color:#888;font-size:12px'>APU no encontrado.</em>";
+  function renderSubitemsHTML(cotItemId, itemData) {
     const secciones = [
-      { key: "equipos",    label: "EQUIPOS" },
-      { key: "materiales", label: "MATERIALES" },
-      { key: "mano_obra",  label: "MANO DE OBRA" },
-      { key: "otros",      label: "OTROS" },
+      { key: "equipos",    label: "EQUIPOS",      color: "#e8f5e9", hcolor: "#2e7d32" },
+      { key: "materiales", label: "MATERIALES",   color: "#fff8e1", hcolor: "#f57f17" },
+      { key: "mano_obra",  label: "MANO DE OBRA", color: "#fce4ec", hcolor: "#c62828" },
+      { key: "otros",      label: "OTROS",         color: "#f3e5f5", hcolor: "#6a1b9a" },
     ];
-    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px">`;
-    let hayAlgo = false;
+    let html = "";
     secciones.forEach(sec => {
-      const items = apu[sec.key] || [];
-      if (!items.length) return;
-      hayAlgo = true;
-      html += `<div>
-        <div style="font-size:10px;font-weight:700;color:#1a237e;letter-spacing:.5px;
-                    border-bottom:1px solid #c5cae9;padding-bottom:3px;margin-bottom:4px">${sec.label}</div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <thead>
-            <tr style="color:#888">
-              <th style="text-align:left;padding:2px 4px;font-weight:600">Descripción</th>
-              <th style="width:55px;text-align:right;padding:2px 4px;font-weight:600">Cant.</th>
-              <th style="width:55px;text-align:right;padding:2px 4px;font-weight:600">Rend.</th>
-              <th style="width:95px;text-align:right;padding:2px 4px;font-weight:600">P. Unit.</th>
-              <th style="width:95px;text-align:right;padding:2px 4px;font-weight:600">Parcial</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map(it => `<tr style="border-top:1px solid #eeeeee">
-              <td style="padding:2px 4px">${it.descripcion_manual || "—"}</td>
-              <td style="text-align:right;padding:2px 4px">${it.cantidad || 0}</td>
-              <td style="text-align:right;padding:2px 4px">${it.rendimiento || "—"}</td>
-              <td style="text-align:right;padding:2px 4px">${COP(it.precio_unitario)}</td>
-              <td style="text-align:right;padding:2px 4px;font-weight:600">${COP(it.valor_parcial)}</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      </div>`;
+      const subitems = itemData[sec.key] || [];
+      if (!subitems.length) return;
+      html += `<tr class="crow-detail" data-cotitem-id="${cotItemId}" style="background:${sec.color}">
+        <td></td>
+        <td colspan="7" style="padding:3px 14px 3px 28px;font-size:10px;font-weight:700;color:${sec.hcolor};letter-spacing:.6px;text-transform:uppercase">${sec.label}</td>
+      </tr>`;
+      subitems.forEach(it => {
+        const cant  = it.cantidad    != null ? it.cantidad    : "—";
+        const rend  = it.rendimiento != null && it.rendimiento !== "" ? it.rendimiento : "—";
+        html += `<tr class="crow-detail" data-cotitem-id="${cotItemId}" style="background:#fafafa">
+          <td></td>
+          <td></td>
+          <td style="padding-left:32px;font-size:11px;color:#333">${it.descripcion_manual || "—"}</td>
+          <td style="text-align:center;font-size:11px;color:#555">${it.unidad || ""}</td>
+          <td style="text-align:right;font-size:11px;color:#555">${cant} <small style="color:#aaa">(rend: ${rend})</small></td>
+          <td style="text-align:right;font-size:11px;color:#555">${COP(it.precio_unitario)}</td>
+          <td style="text-align:right;font-size:11px;color:#444;font-weight:600">${COP(it.valor_parcial)}</td>
+          <td></td>
+        </tr>`;
+      });
     });
-    html += `</div>`;
-    if (!hayAlgo) return "<em style='color:#888;font-size:12px'>Este APU no tiene ítems registrados.</em>";
     return html;
+  }
+
+  function insertarSubitemsFilaCot(cotItemId, apu) {
+    if (!apu) return;
+    const mainRow = document.getElementById("crow-" + cotItemId);
+    if (!mainRow) return;
+    // Eliminar sub-ítems anteriores si existen
+    document.querySelectorAll(`.crow-detail[data-cotitem-id="${cotItemId}"]`).forEach(r => r.remove());
+    // Insertar nuevos
+    mainRow.insertAdjacentHTML("afterend", renderSubitemsHTML(cotItemId, apu));
   }
 
   function eliminarFilaCot(id) {
     if (!confirm("¿Eliminar este APU de la cotización?")) return;
-    document.getElementById("crow-"   + id)?.remove();
-    document.getElementById("detail-" + id)?.remove();
+    document.querySelectorAll(`[data-cotitem-id="${id}"]`).forEach(el => el.remove());
     delete cotItems[id];
     recalcularTotalCot();
     renumerarFilasCot();
@@ -1661,6 +1719,10 @@
     google.script.run
       .withSuccessHandler(res => {
         reemplazarTempIdCot(tempId, res.id);
+        // Cargar sub-ítems del APU y mostrarlos en la fila
+        google.script.run
+          .withSuccessHandler(apuCompleto => insertarSubitemsFilaCot(res.id, apuCompleto))
+          .getAPUCompleto(apuId);
         if (esElPrimero && apu.cliente) {
           google.script.run.actualizarCotizacion(cotActual.id, { cliente: apu.cliente });
         }
@@ -1670,26 +1732,22 @@
   }
 
   function reemplazarTempIdCot(tempId, realId) {
-    const row = document.getElementById("crow-" + tempId);
-    if (row) {
-      row.id = "crow-" + realId;
-      row.querySelectorAll("[onclick],[onchange]").forEach(el => {
+    // Actualizar todos los elementos de este ítem (fila principal + sub-ítems)
+    document.querySelectorAll(`[data-cotitem-id="${tempId}"]`).forEach(el => {
+      el.dataset.cotitemId = String(realId);
+    });
+    const mainRow = document.getElementById("crow-" + tempId);
+    if (mainRow) {
+      mainRow.id = "crow-" + realId;
+      mainRow.querySelectorAll("[onclick],[onchange]").forEach(el => {
         ["onclick","onchange"].forEach(attr => {
           const v = el.getAttribute(attr);
-          if (v) el.setAttribute(attr, v.replace(new RegExp(tempId, "g"), realId));
+          if (v) el.setAttribute(attr, v.replace(new RegExp(String(tempId).replace(/[.*+?^${}()|[\]\\]/g,"\\$&"), "g"), realId));
         });
       });
-      const cvpEl  = document.getElementById("cvp-"     + tempId);
-      if (cvpEl)  cvpEl.id  = "cvp-"     + realId;
-      const btnTog = document.getElementById("btn-tog-" + tempId);
-      if (btnTog) btnTog.id = "btn-tog-" + realId;
     }
-    const detailRow = document.getElementById("detail-" + tempId);
-    if (detailRow) {
-      detailRow.id = "detail-" + realId;
-      const detailBody = document.getElementById("detail-body-" + tempId);
-      if (detailBody) detailBody.id = "detail-body-" + realId;
-    }
+    const cvpEl = document.getElementById("cvp-" + tempId);
+    if (cvpEl) cvpEl.id = "cvp-" + realId;
     if (tempId in cotItems) {
       cotItems[realId] = cotItems[tempId];
       delete cotItems[tempId];
@@ -1722,6 +1780,39 @@
   }
 
   // ═══ ENVIAR COTIZACIÓN + GUARDAR PDF EN DRIVE ════════════════════════════
+  function descargarPDF() {
+    if (!cotActual) { alert("Guarda la cotización primero."); return; }
+    const btn = document.getElementById("btn-pdf");
+    btn.textContent = "Generando...";
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(res => {
+        btn.textContent = "⬇ Descargar PDF";
+        btn.disabled = false;
+        if (!res.ok) { alert("Error generando PDF: " + res.error); return; }
+        const blob = b64toBlob(res.base64, "application/pdf");
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href     = url;
+        a.download = res.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .withFailureHandler(err => {
+        btn.textContent = "⬇ Descargar PDF";
+        btn.disabled = false;
+        alert("Error: " + err.message);
+      })
+      .descargarPDFBase64(cotActual.id);
+  }
+
+  function b64toBlob(b64, type) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type });
+  }
+
   function enviarPorCorreo() {
     if (!cotActual) { alert("Guarda la cotización primero."); return; }
     const email = prompt("Correo electrónico del cliente:");

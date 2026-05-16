@@ -39,6 +39,15 @@ function formatearTodasLasHojas(ss) {
     [50, 125, 210, 210, 100, 130, 85, 85, 85, 85, 130, 75, 210, 250, 180, 180, 280],
     [6, 11], [3, 4, 13, 14, 15, 16, 17]);
 
+  // Bloquear columnas de % como número plano (evita que Sheets las guarde como decimal)
+  const cotSheetFmt = ss.getSheetByName("Cotizaciones");
+  if (cotSheetFmt) {
+    const nDataCot = Math.max(cotSheetFmt.getLastRow() - 1, 20);
+    [7, 8, 9, 10].forEach(col =>
+      cotSheetFmt.getRange(2, col, nDataCot, 1).setNumberFormat("0.##")
+    );
+  }
+
   fmtHoja(ss, "Cotizacion_Items",
     [50, 110, 70, 70, 260, 70, 90, 135, 135],
     [8, 9], [5]);
