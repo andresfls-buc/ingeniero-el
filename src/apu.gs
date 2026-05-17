@@ -185,11 +185,10 @@ function _llenarHojaAPU(sheet, apu, ss) {
     .setBackground("#ffffff");
   r++;
 
-  // Datos generales
+  // Datos generales — fila 1: cliente + código; fila 2: unidad + fecha
   const datosGen = [
-    ["DESCRIPCIÓN", apu.descripcion || "—", "CÓDIGO",   apu.codigo_item || "—"],
-    ["CLIENTE / OBRA", apu.cliente  || "—", "UNIDAD",   apu.unidad      || "—"],
-    ["ACTIVIDAD",   apu.actividad   || "—", "FECHA",    apu.fecha       || "—"],
+    ["CLIENTE / OBRA", apu.cliente  || "—", "CÓDIGO", apu.codigo_item || "—"],
+    ["UNIDAD",         apu.unidad   || "—", "FECHA",  apu.fecha       || "—"],
   ];
   datosGen.forEach(fila => {
     sheet.setRowHeight(r, 22);
@@ -212,9 +211,17 @@ function _llenarHojaAPU(sheet, apu, ss) {
     r++;
   });
 
-  // Separador
-  sheet.setRowHeight(r, 6);
-  sheet.getRange(r, 1, 1, 7).merge().setValue("").setBackground("#1a237e");
+  // Fila ACTIVIDAD — ocupa todo el ancho restante con wrap para textos largos
+  sheet.setRowHeight(r, 36);
+  sheet.getRange(r, 1, 1, 2).merge().setValue("ACTIVIDAD")
+    .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
+    .setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setBackground("#f5f5f5");
+  sheet.getRange(r, 3, 1, 5).merge().setValue(apu.actividad || "—")
+    .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setWrap(true).setBackground("#ffffff");
+  sheet.getRange(r, 1, 1, 7)
+    .setBorder(true, true, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
   r++;
 
   // Secciones del APU
@@ -301,16 +308,71 @@ function _llenarHojaAPU(sheet, apu, ss) {
   sheet.getRange(r, 1, 1, 7).merge().setValue("").setBackground("#888888");
   r++;
 
-  // COSTO NETO TOTAL
-  sheet.setRowHeight(r, 28);
+  // COSTO DIRECTO TOTAL
+  sheet.setRowHeight(r, 24);
   const costoNeto = parseFloat(apu.costo_neto) || 0;
   sheet.getRange(r, 1, 1, 6).merge()
-    .setValue("PRECIO UNITARIO  (A + B + C + D)")
-    .setFontSize(11).setFontWeight("bold").setFontColor("#ffffff")
+    .setValue("COSTOS DIRECTOS  (A + B + C + D)")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   sheet.getRange(r, 7).setValue(costoNeto)
-    .setNumberFormat(MONEY).setFontSize(11).setFontWeight("bold").setFontColor("#ffffff")
+    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+  r++;
+
+  // Encabezado COSTOS INDIRECTOS
+  sheet.setRowHeight(r, 18);
+  sheet.getRange(r, 1, 1, 7).merge()
+    .setValue("COSTOS INDIRECTOS")
+    .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setBackground("#37474f");
+  r++;
+
+  // Filas de indirectos
+  const admPct  = parseFloat(apu.administracion_pct) || 0;
+  const impPct  = parseFloat(apu.imprevistos_pct)    || 0;
+  const utilPct = parseFloat(apu.utilidad_pct)       || 0;
+  const indirectos = [
+    ["Administración",  admPct,  Math.round(costoNeto * admPct  / 100)],
+    ["Imprevistos",     impPct,  Math.round(costoNeto * impPct  / 100)],
+    ["Utilidad",        utilPct, Math.round(costoNeto * utilPct / 100)],
+  ];
+  indirectos.forEach(([label, pct, valor]) => {
+    sheet.setRowHeight(r, 20);
+    sheet.getRange(r, 1, 1, 4).merge()
+      .setValue(label)
+      .setFontSize(9).setFontColor("#333333")
+      .setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 5, 1, 2).merge()
+      .setValue(pct / 100)
+      .setNumberFormat("0.##%").setFontSize(9).setFontColor("#555555")
+      .setHorizontalAlignment("center").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 7).setValue(valor)
+      .setNumberFormat(MONEY).setFontSize(9).setFontColor("#333333")
+      .setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    r++;
+  });
+
+  // VALOR UNITARIO TOTAL
+  const subtotalInd = Math.round(costoNeto * (admPct + impPct + utilPct) / 100);
+  const valorTotal  = costoNeto + subtotalInd;
+  sheet.setRowHeight(r, 30);
+  sheet.getRange(r, 1, 1, 6).merge()
+    .setValue("VALOR UNITARIO TOTAL")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+  sheet.getRange(r, 7).setValue(valorTotal)
+    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
 }
