@@ -1,18 +1,417 @@
-// ─── CARGA DE BD (para búsqueda client-side) ─────────────────────────────────
+// ─── DIAGNÓSTICO ──────────────────────────────────────────────────────────────
 
-function cargarTodosBD() {
+function diagnosticarBD() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { error: "getActiveSpreadsheet() retornó null — el script no está vinculado a ningún spreadsheet." };
+  const hojas        = ss.getSheets().map(s => s.getName());
+  const equiposSheet = ss.getSheetByName("Equipos");
+  const equiposFilas = equiposSheet ? equiposSheet.getLastRow() : -1;
+  const equiposCols  = equiposSheet ? equiposSheet.getLastColumn() : -1;
+  const equiposParsed = equiposSheet ? sheetToObjects(ss, "Equipos").length : -1;
   return {
-    materiales: sheetToObjects(ss, "Materiales"),
-    manoObra:   sheetToObjects(ss, "ManoObra"),
-    equipos:    sheetToObjects(ss, "Equipos"),
+    spreadsheetNombre: ss.getName(),
+    spreadsheetId:     ss.getId(),
+    hojas:             hojas,
+    equiposFilas:      equiposFilas,
+    equiposCols:       equiposCols,
+    equiposParsed:     equiposParsed,
   };
+}
+
+// ─── CARGA DE BD (por tipo, para evitar límite de serialización) ──────────────
+
+function cargarEquipos() {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Equipos");
+  return items.map(e => ({
+    id:         e.id,
+    nombre:     e.nombre,
+    tarifa_dia: e.tarifa_dia,
+    partida:    e.partida || "",
+  }));
+}
+
+function cargarMateriales() {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  return items.map(m => ({
+    id:             m.id,
+    codigo:         m.codigo,
+    categoria:      m.categoria,
+    nombre:         m.nombre,
+    unidad:         m.unidad,
+    precio_sin_iva: m.precio_sin_iva,
+  }));
+}
+
+function cargarManoObra() {
+  return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "ManoObra");
+}
+
+function cargarCategoriasMateriales() {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  const cats = [...new Set(items.map(m => String(m.categoria || "")).filter(Boolean))].sort();
+  return cats;
+}
+
+function buscarMateriales(query, categoria) {
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales");
+  const q   = String(query    || "").toLowerCase().trim();
+  const cat = String(categoria || "").trim();
+  return items.filter(m => {
+    const matchCat = !cat || m.categoria === cat;
+    const matchQ   = !q
+      || String(m.nombre  || "").toLowerCase().includes(q)
+      || String(m.codigo  || "").toLowerCase().includes(q);
+    return matchCat && matchQ;
+  }).slice(0, 50);
+}
+
+// ─── GENERAR PDF DEL APU ─────────────────────────────────────────────────────
+
+function _generarBlobPDFApu(apuId) {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const apu = getAPUCompleto(apuId);
+  if (!apu) return null;
+
+  const tmpName = "_apu_pdf_tmp_";
+  let tmp = ss.getSheetByName(tmpName);
+  if (tmp) ss.deleteSheet(tmp);
+  tmp = ss.insertSheet(tmpName);
+
+  _llenarHojaAPU(tmp, apu, ss);
+  SpreadsheetApp.flush();
+
+  const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
+    + "/export?format=pdf&gid=" + tmp.getSheetId()
+    + "&portrait=true&fitw=true&size=letter"
+    + "&gridlines=false&printtitle=false&sheetnames=false"
+    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+
+  const blob = UrlFetchApp.fetch(url, {
+    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
+  }).getBlob();
+
+  ss.deleteSheet(tmp);
+  return { blob, apu };
+}
+
+function exportarAPUaDrive(apuId) {
+  try {
+    const result = _generarBlobPDFApu(apuId);
+    if (!result) return { ok: false, error: "APU no encontrado" };
+    const { blob, apu } = result;
+
+    const cfg      = getConfig();
+    const folderId = (cfg["carpeta_apus"] || "").trim();
+    if (!folderId) return { ok: false, error: "Configura 'carpeta_apus' en la hoja Configuracion con el ID de tu carpeta de Drive." };
+
+    const folder   = DriveApp.getFolderById(folderId);
+    const slug     = String(apu.cliente || apu.descripcion || "apu")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
+    const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = codigo + "_" + slug + ".pdf";
+
+    // Reemplazar archivo anterior con el mismo nombre si existe
+    const iter = folder.getFilesByName(fileName);
+    while (iter.hasNext()) iter.next().setTrashed(true);
+
+    blob.setName(fileName);
+    folder.createFile(blob);
+    return { ok: true, fileName };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function descargarAPUBase64(apuId) {
+  try {
+    const result = _generarBlobPDFApu(apuId);
+    if (!result) return { ok: false, error: "APU no encontrado" };
+    const { blob, apu } = result;
+
+    const slug     = String(apu.cliente || apu.descripcion || "apu")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
+    const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = codigo + "_" + slug + ".pdf";
+
+    return { ok: true, base64: Utilities.base64Encode(blob.getBytes()), fileName };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function _llenarHojaAPU(sheet, apu, ss) {
+  const MONEY    = '"$"#,##0';
+  const NEGRO    = "#1a1a1a";
+  const GRIS_OSC = "#424242";
+  const GRIS_CLR = "#f5f5f5";
+  const BORDE    = "#dddddd";
+  const cfg      = getConfig();
+  const empresa = (cfg["empresa"] || "").trim();
+  const logoId  = (cfg["logo_id"] || "").trim();
+
+  sheet.setColumnWidth(1, 40);
+  sheet.setColumnWidth(2, 255);
+  sheet.setColumnWidth(3, 62);
+  sheet.setColumnWidth(4, 68);
+  sheet.setColumnWidth(5, 68);
+  sheet.setColumnWidth(6, 118);
+  sheet.setColumnWidth(7, 118);
+
+  let r = 1;
+
+  // Fila 1: Logo + Título
+  sheet.setRowHeight(r, 85);
+  sheet.getRange(r, 1, 1, 2).merge().setValue("").setBackground("#ffffff");
+  const titulo = ["APU", apu.codigo_item, empresa].filter(Boolean).join("  —  ");
+  sheet.getRange(r, 3, 1, 5).merge()
+    .setValue(titulo)
+    .setFontSize(13).setFontWeight("bold")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBackground("#ffffff");
+  if (logoId) {
+    try {
+      const img = sheet.insertImage(DriveApp.getFileById(logoId).getBlob(), 1, r);
+      img.setWidth(215).setHeight(78);
+    } catch(e) {}
+  }
+  r++;
+
+  // Separador
+  sheet.setRowHeight(r, 4);
+  sheet.getRange(r, 1, 1, 7).merge().setValue("")
+    .setBorder(false, false, true, false, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+    .setBackground("#ffffff");
+  r++;
+
+  // Datos generales — fila 1: cliente + código; fila 2: unidad + fecha
+  const datosGen = [
+    ["CLIENTE / OBRA", apu.cliente  || "—", "CÓDIGO", apu.codigo_item || "—"],
+    ["UNIDAD",         apu.unidad   || "—", "FECHA",  apu.fecha       || "—"],
+  ];
+  datosGen.forEach(fila => {
+    sheet.setRowHeight(r, 22);
+    sheet.getRange(r, 1, 1, 2).merge().setValue(fila[0])
+      .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
+      .setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground("#f5f5f5");
+    sheet.getRange(r, 3, 1, 2).merge().setValue(fila[1])
+      .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground("#ffffff");
+    sheet.getRange(r, 5).setValue(fila[2])
+      .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
+      .setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground("#f5f5f5");
+    sheet.getRange(r, 6, 1, 2).merge().setValue(fila[3])
+      .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground("#ffffff");
+    sheet.getRange(r, 1, 1, 7)
+      .setBorder(true, true, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    r++;
+  });
+
+  // Fila ACTIVIDAD — ocupa todo el ancho restante con wrap para textos largos
+  sheet.setRowHeight(r, 36);
+  sheet.getRange(r, 1, 1, 2).merge().setValue("ACTIVIDAD")
+    .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
+    .setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setBackground("#f5f5f5");
+  sheet.getRange(r, 3, 1, 5).merge().setValue(apu.actividad || "—")
+    .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setWrap(true).setBackground("#ffffff");
+  sheet.getRange(r, 1, 1, 7)
+    .setBorder(true, true, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+  r++;
+
+  // Secciones del APU
+  const secciones = [
+    { key: "equipos",    label: "A — EQUIPOS",      campo: "subtotal_equipos"    },
+    { key: "materiales", label: "B — MATERIALES",   campo: "subtotal_materiales" },
+    { key: "mano_obra",  label: "C — MANO DE OBRA", campo: "subtotal_mano_obra"  },
+    { key: "otros",      label: "D — OTROS",        campo: "subtotal_otros"      },
+  ];
+
+  secciones.forEach(sec => {
+    const items    = apu[sec.key] || [];
+    const subtotal = parseFloat(apu[sec.campo]) || 0;
+
+    // Encabezado de sección
+    sheet.setRowHeight(r, 24);
+    sheet.getRange(r, 1, 1, 7).merge()
+      .setValue(sec.label)
+      .setBackground(GRIS_OSC).setFontColor("#ffffff")
+      .setFontWeight("bold").setFontSize(9)
+      .setHorizontalAlignment("left").setVerticalAlignment("middle");
+    r++;
+
+    if (items.length > 0) {
+      // Cabecera de columnas
+      sheet.setRowHeight(r, 20);
+      sheet.getRange(r, 1, 1, 7)
+        .setValues([["ÍTEM", "DESCRIPCIÓN", "UNIDAD", "CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"]])
+        .setBackground(GRIS_CLR).setFontColor("#333333")
+        .setFontWeight("bold").setFontSize(8)
+        .setHorizontalAlignment("center").setVerticalAlignment("middle")
+        .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      r++;
+
+      items.forEach((it, idx) => {
+        sheet.setRowHeight(r, 20);
+        const rend = (it.rendimiento !== null && it.rendimiento !== "") ? it.rendimiento : "—";
+        const bg   = idx % 2 === 0 ? "#ffffff" : "#fafafa";
+        sheet.getRange(r, 1).setValue(idx + 1)
+          .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        sheet.getRange(r, 2).setValue(it.descripcion_manual || "—")
+          .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
+        sheet.getRange(r, 3).setValue(it.unidad || "")
+          .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        sheet.getRange(r, 4).setValue(it.cantidad || 0)
+          .setFontSize(8).setHorizontalAlignment("right").setVerticalAlignment("middle");
+        sheet.getRange(r, 5).setValue(rend)
+          .setFontSize(8).setHorizontalAlignment("right").setVerticalAlignment("middle");
+        sheet.getRange(r, 6).setValue(parseFloat(it.precio_unitario) || 0)
+          .setNumberFormat(MONEY).setFontSize(8).setHorizontalAlignment("right").setVerticalAlignment("middle");
+        sheet.getRange(r, 7).setValue(parseFloat(it.valor_parcial) || 0)
+          .setNumberFormat(MONEY).setFontSize(8).setFontWeight("bold").setHorizontalAlignment("right").setVerticalAlignment("middle");
+        sheet.getRange(r, 1, 1, 7)
+          .setBackground(bg)
+          .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        r++;
+      });
+    } else {
+      sheet.setRowHeight(r, 18);
+      sheet.getRange(r, 1, 1, 7).merge()
+        .setValue("Sin ítems").setFontSize(8).setFontColor("#aaaaaa")
+        .setHorizontalAlignment("center").setBackground("#fafafa");
+      r++;
+    }
+
+    // Subtotal de sección
+    sheet.setRowHeight(r, 22);
+    sheet.getRange(r, 1, 1, 6).merge()
+      .setValue("SUBTOTAL " + sec.label.split("—")[0].trim())
+      .setFontSize(9).setFontWeight("bold").setFontColor("#333333")
+      .setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, true, true, null, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 7).setValue(subtotal)
+      .setNumberFormat(MONEY).setFontSize(9).setFontWeight("bold").setFontColor("#111111")
+      .setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, null, true, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+    r++;
+  });
+
+  // Separador antes del total
+  sheet.setRowHeight(r, 4);
+  sheet.getRange(r, 1, 1, 7).merge().setValue("").setBackground("#888888");
+  r++;
+
+  // COSTO DIRECTO TOTAL
+  sheet.setRowHeight(r, 24);
+  const costoNeto = parseFloat(apu.costo_neto) || 0;
+  sheet.getRange(r, 1, 1, 6).merge()
+    .setValue("COSTOS DIRECTOS  (A + B + C + D)")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+  sheet.getRange(r, 7).setValue(costoNeto)
+    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+  r++;
+
+  // Encabezado COSTOS INDIRECTOS
+  sheet.setRowHeight(r, 18);
+  sheet.getRange(r, 1, 1, 7).merge()
+    .setValue("COSTOS INDIRECTOS")
+    .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("left").setVerticalAlignment("middle")
+    .setBackground("#37474f");
+  r++;
+
+  // Filas de indirectos
+  const admPct  = parseFloat(apu.administracion_pct) || 0;
+  const impPct  = parseFloat(apu.imprevistos_pct)    || 0;
+  const utilPct = parseFloat(apu.utilidad_pct)       || 0;
+  const indirectos = [
+    ["Administración",  admPct,  Math.round(costoNeto * admPct  / 100)],
+    ["Imprevistos",     impPct,  Math.round(costoNeto * impPct  / 100)],
+    ["Utilidad",        utilPct, Math.round(costoNeto * utilPct / 100)],
+  ];
+  indirectos.forEach(([label, pct, valor]) => {
+    sheet.setRowHeight(r, 20);
+    sheet.getRange(r, 1, 1, 4).merge()
+      .setValue(label)
+      .setFontSize(9).setFontColor("#333333")
+      .setHorizontalAlignment("left").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 5, 1, 2).merge()
+      .setValue(pct / 100)
+      .setNumberFormat("0.##%").setFontSize(9).setFontColor("#555555")
+      .setHorizontalAlignment("center").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 7).setValue(valor)
+      .setNumberFormat(MONEY).setFontSize(9).setFontColor("#333333")
+      .setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBackground(GRIS_CLR)
+      .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    r++;
+  });
+
+  // VALOR UNITARIO TOTAL
+  const subtotalInd = Math.round(costoNeto * (admPct + impPct + utilPct) / 100);
+  const valorTotal  = costoNeto + subtotalInd;
+  sheet.setRowHeight(r, 30);
+  sheet.getRange(r, 1, 1, 6).merge()
+    .setValue("VALOR UNITARIO TOTAL")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+  sheet.getRange(r, 7).setValue(valorTotal)
+    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle")
+    .setBackground(NEGRO);
+}
+
+// ─── ELIMINAR APU ────────────────────────────────────────────────────────────
+
+function eliminarAPU(apuId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const itemsSheet = ss.getSheetByName("APU_Items");
+  const itemsData  = itemsSheet.getDataRange().getValues();
+  const ih         = itemsData[0];
+  for (let i = itemsData.length - 1; i >= 1; i--) {
+    if (itemsData[i][ih.indexOf("apu_id")] == apuId) itemsSheet.deleteRow(i + 1);
+  }
+
+  const apuSheet = ss.getSheetByName("APU");
+  const apuData  = apuSheet.getDataRange().getValues();
+  for (let i = 1; i < apuData.length; i++) {
+    if (apuData[i][0] == apuId) { apuSheet.deleteRow(i + 1); return { ok: true }; }
+  }
+  return { ok: false };
 }
 
 // ─── LISTA DE APUs ────────────────────────────────────────────────────────────
 
 function listarAPUs() {
-  return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
+  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
+  return items.map(a => ({
+    id:          a.id,
+    codigo_item: a.codigo_item,
+    descripcion: a.descripcion,
+    unidad:      a.unidad,
+    cliente:     a.cliente,
+    direccion:   a.direccion   || "",
+    actividad:   a.actividad,
+    costo_neto:  a.costo_neto,
+    fecha:       String(a.fecha || ""),
+  }));
 }
 
 // ─── CREAR APU ────────────────────────────────────────────────────────────────
@@ -21,22 +420,34 @@ function crearAPU(datos) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("APU");
   const data  = sheet.getDataRange().getValues();
+  const headers = data[0];
   const lastId = data.length > 1
     ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
     : 0;
   const newId = lastId + 1;
   const fecha = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
-  sheet.appendRow([
-    newId,
-    datos.codigo_item || "",
-    datos.descripcion || datos.codigo_item || "",
-    datos.unidad      || "",
-    datos.cliente     || "",
-    datos.actividad   || "",
-    0, 0, 0, 0, 0,
-    fecha
-  ]);
+  const valores = {
+    id:                  newId,
+    codigo_item:         datos.codigo_item || "",
+    descripcion:         datos.descripcion || datos.codigo_item || "",
+    unidad:              datos.unidad      || "",
+    cliente:             datos.cliente     || "",
+    direccion:           datos.direccion   || "",
+    actividad:           datos.actividad   || "",
+    subtotal_equipos:    0,
+    subtotal_materiales: 0,
+    subtotal_mano_obra:  0,
+    subtotal_otros:      0,
+    costo_neto:          0,
+    administracion_pct:  0,
+    imprevistos_pct:     0,
+    utilidad_pct:        0,
+    iva_pct:             19,
+    valor_total:         0,
+    fecha:               fecha,
+  };
+  sheet.appendRow(headers.map(h => valores[h] !== undefined ? valores[h] : ""));
   return newId;
 }
 
@@ -50,13 +461,32 @@ function actualizarCabezaAPU(apuId, datos) {
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == apuId) {
-      const campos = ["codigo_item", "descripcion", "unidad", "cliente", "actividad"];
+      const campos = [
+        "codigo_item", "descripcion", "unidad", "cliente", "direccion", "actividad",
+        "administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct",
+      ];
       campos.forEach(campo => {
         if (datos[campo] !== undefined) {
           const col = headers.indexOf(campo);
           if (col >= 0) sheet.getRange(i + 1, col + 1).setValue(datos[campo]);
         }
       });
+      // Recalculate valor_total if any AIU field was updated
+      if (datos.administracion_pct !== undefined || datos.imprevistos_pct !== undefined ||
+          datos.utilidad_pct !== undefined       || datos.iva_pct        !== undefined) {
+        const row = data[i];
+        const neto      = parseFloat(row[headers.indexOf("costo_neto")])        || 0;
+        const admPct    = parseFloat(datos.administracion_pct ?? row[headers.indexOf("administracion_pct")]) || 0;
+        const impPct    = parseFloat(datos.imprevistos_pct    ?? row[headers.indexOf("imprevistos_pct")])    || 0;
+        const utilPct   = parseFloat(datos.utilidad_pct       ?? row[headers.indexOf("utilidad_pct")])       || 0;
+        const ivaPct    = parseFloat(datos.iva_pct            ?? row[headers.indexOf("iva_pct")])            || 0;
+        const subtotalAIU = neto * (admPct + impPct + utilPct) / 100;
+        const sinIVA      = neto + subtotalAIU;
+        const iva         = sinIVA * ivaPct / 100;
+        const total       = sinIVA + iva;
+        const colVT = headers.indexOf("valor_total");
+        if (colVT >= 0) sheet.getRange(i + 1, colVT + 1).setValue(Math.round(total));
+      }
       return { ok: true };
     }
   }
@@ -75,10 +505,13 @@ function getAPUCompleto(apuId) {
   if (!apuRow) return null;
 
   const apu = {};
-  apuHeaders.forEach((h, i) => apu[h] = apuRow[i]);
+  apuHeaders.forEach((h, i) => {
+    const v = apuRow[i];
+    apu[h] = (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy") : v;
+  });
 
-  const itemsSheet   = ss.getSheetByName("APU_Items");
-  const itemsData    = itemsSheet.getDataRange().getValues();
+  const itemsSheet = ss.getSheetByName("APU_Items");
+  const itemsData  = itemsSheet.getDataRange().getValues();
   if (itemsData.length < 2) {
     apu.equipos = []; apu.materiales = []; apu.mano_obra = []; apu.otros = [];
     return apu;
@@ -87,7 +520,14 @@ function getAPUCompleto(apuId) {
   const ih    = itemsData[0];
   const items = itemsData.slice(1)
     .filter(r => r[ih.indexOf("apu_id")] == apuId)
-    .map(r => { const o = {}; ih.forEach((h, i) => o[h] = r[i]); return o; });
+    .map(r => {
+      const o = {};
+      ih.forEach((h, i) => {
+        const v = r[i];
+        o[h] = (v instanceof Date) ? Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy") : v;
+      });
+      return o;
+    });
 
   apu.equipos    = items.filter(i => i.tipo === "EQUIPO");
   apu.materiales = items.filter(i => i.tipo === "MATERIAL");
@@ -107,16 +547,17 @@ function agregarItemAPU(apuId, item) {
     : 0;
   const newId = lastId + 1;
 
-  const cant  = parseFloat(item.cantidad)        || 0;
-  const precio= parseFloat(item.precio_unitario) || 0;
-  const rend  = parseFloat(item.rendimiento)     || 1;
-  const vp    = calcularValorParcial(item.tipo, cant, precio, rend);
+  const cant    = parseFloat(item.cantidad)        || 0;
+  const precio  = parseFloat(item.precio_unitario) || 0;
+  const rend    = parseFloat(item.rendimiento)     || 1;
+  const vp      = calcularValorParcial(item.tipo, cant, precio, rend);
+  const partida = getPartidaRecurso(ss, item.tipo, item.recurso_id || "");
 
   sheet.appendRow([
     newId, apuId, item.tipo,
-    item.recurso_id        || "",
-    item.descripcion_manual|| "",
-    cant, rend, precio, vp
+    item.recurso_id         || "",
+    item.descripcion_manual || "",
+    cant, rend, precio, vp, partida
   ]);
 
   recalcularSubtotales(ss, apuId);
@@ -211,11 +652,11 @@ function actualizarPrecioRecurso(tipo, id, nuevoPrecio) {
 // Equipos:   (a × b) / c  = (cant × tarifa_dia) / rendimiento
 // Materiales: d × e        = precio × cantidad
 // Mano obra: (f × g) / h  = (cant × costo_dia) / rendimiento
-// Otros:      i / j        = valor_total / cantidad_unidades
+// Otros:      i × j        = costo_unitario × cantidad
 function calcularValorParcial(tipo, cant, precio, rend) {
   if (tipo === "EQUIPO"   || tipo === "MANO_OBRA") return rend > 0 ? (cant * precio) / rend : 0;
   if (tipo === "MATERIAL")                          return cant * precio;
-  if (tipo === "OTRO")                              return cant > 0 ? precio / cant : 0;
+  if (tipo === "OTRO")                              return precio * cant;
   return 0;
 }
 
@@ -247,20 +688,60 @@ function recalcularSubtotales(ss, apuId) {
       apuSheet.getRange(i + 1, ah.indexOf("subtotal_mano_obra")  + 1).setValue(subMo);
       apuSheet.getRange(i + 1, ah.indexOf("subtotal_otros")      + 1).setValue(subOt);
       apuSheet.getRange(i + 1, ah.indexOf("costo_neto")          + 1).setValue(neto);
+      const admPct  = parseFloat(apuData[i][ah.indexOf("administracion_pct")]) || 0;
+      const impPct  = parseFloat(apuData[i][ah.indexOf("imprevistos_pct")])    || 0;
+      const utilPct = parseFloat(apuData[i][ah.indexOf("utilidad_pct")])       || 0;
+      const ivaPct  = parseFloat(apuData[i][ah.indexOf("iva_pct")])            || 0;
+      const subtAIU = neto * (admPct + impPct + utilPct) / 100;
+      const sinIVA  = neto + subtAIU;
+      const total   = sinIVA + sinIVA * ivaPct / 100;
+      const colVT = ah.indexOf("valor_total");
+      if (colVT >= 0) apuSheet.getRange(i + 1, colVT + 1).setValue(Math.round(total));
       break;
     }
   }
 }
 
+// ─── MIGRACIÓN AIU EN APU ─────────────────────────────────────────────────────
+// Agrega columnas AIU a la hoja APU si no existen todavía.
+
+function migrarAIUenAPU() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("APU");
+  if (!sheet) { SpreadsheetApp.getUi().alert("Hoja APU no encontrada."); return; }
+
+  const lastCol = sheet.getLastColumn();
+  const hRow    = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  const nuevas  = ["administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct", "valor_total"];
+  const msgs    = [];
+
+  nuevas.forEach(col => {
+    if (!hRow.includes(col)) {
+      const newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue(col);
+      if (col === "iva_pct" && sheet.getLastRow() > 1) {
+        sheet.getRange(2, newCol, sheet.getLastRow() - 1, 1).setValue(19);
+      }
+      msgs.push("✅ Columna '" + col + "' agregada.");
+    } else {
+      msgs.push("— '" + col + "' ya existía.");
+    }
+  });
+
+  SpreadsheetApp.getUi().alert("Migración AIU en APU:\n\n" + msgs.join("\n"));
+}
+
 function sheetToObjects(ss, name) {
   const sheet = ss.getSheetByName(name);
   if (!sheet) return [];
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-  const headers = data[0];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  const data    = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = data[0].map(h => String(h).trim());
   return data.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => { if (h) obj[h] = row[i]; });
     return obj;
   });
 }
