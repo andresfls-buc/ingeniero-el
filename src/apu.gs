@@ -81,10 +81,7 @@ function _generarBlobPDFApu(apuId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
   const blob = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -92,6 +89,41 @@ function _generarBlobPDFApu(apuId) {
 
   ss.deleteSheet(tmp);
   return { blob, apu };
+}
+
+function listarArchivosDrive() {
+  const cfg = getConfig();
+  const resultado = [];
+  const carpetas = [
+    { key: "carpeta_apus",         tipo: "APU" },
+    { key: "carpeta_cotizaciones", tipo: "COT" },
+  ];
+  carpetas.forEach(({ key, tipo }) => {
+    const id = (cfg[key] || "").trim();
+    if (!id) return;
+    try {
+      _recolectarArchivos(DriveApp.getFolderById(id), tipo, resultado);
+    } catch(e) {}
+  });
+  resultado.sort((a, b) => (b.fecha > a.fecha ? 1 : b.fecha < a.fecha ? -1 : 0));
+  return resultado;
+}
+
+function _recolectarArchivos(folder, tipo, resultado) {
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    resultado.push({
+      nombre: f.getName(),
+      url:    f.getUrl(),
+      fecha:  Utilities.formatDate(f.getDateCreated(), Session.getScriptTimeZone(), "dd/MM/yyyy"),
+      tipo,
+    });
+  }
+  const subs = folder.getFolders();
+  while (subs.hasNext()) {
+    _recolectarArchivos(subs.next(), tipo, resultado);
+  }
 }
 
 function exportarAPUaDrive(apuId) {
@@ -109,7 +141,7 @@ function exportarAPUaDrive(apuId) {
       .normalize("NFD").replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
     const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const fileName = codigo + "_" + slug + ".pdf";
+    const fileName = codigo + "_" + slug + ".xlsx";
 
     // Reemplazar archivo anterior con el mismo nombre si existe
     const iter = folder.getFilesByName(fileName);
@@ -133,7 +165,7 @@ function descargarAPUBase64(apuId) {
       .normalize("NFD").replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
     const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const fileName = codigo + "_" + slug + ".pdf";
+    const fileName = codigo + "_" + slug + ".xlsx";
 
     return { ok: true, base64: Utilities.base64Encode(blob.getBytes()), fileName };
   } catch(e) {
@@ -190,15 +222,17 @@ function _llenarHojaAPU(sheet, apu, ss) {
     ["CLIENTE / OBRA", apu.cliente  || "—", "CÓDIGO", apu.codigo_item || "—"],
     ["UNIDAD",         apu.unidad   || "—", "FECHA",  apu.fecha       || "—"],
   ];
-  datosGen.forEach(fila => {
-    sheet.setRowHeight(r, 22);
+  datosGen.forEach((fila, idx) => {
+    const isCliente = idx === 0;
+    sheet.setRowHeight(r, isCliente ? 44 : 22);
     sheet.getRange(r, 1, 1, 2).merge().setValue(fila[0])
       .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
       .setHorizontalAlignment("left").setVerticalAlignment("middle")
       .setBackground("#f5f5f5");
-    sheet.getRange(r, 3, 1, 2).merge().setValue(fila[1])
+    const valorCell = sheet.getRange(r, 3, 1, 2).merge().setValue(fila[1])
       .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
       .setBackground("#ffffff");
+    if (isCliente) valorCell.setWrap(true).setVerticalAlignment("top");
     sheet.getRange(r, 5).setValue(fila[2])
       .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
       .setHorizontalAlignment("left").setVerticalAlignment("middle")
@@ -247,13 +281,31 @@ function _llenarHojaAPU(sheet, apu, ss) {
 
     if (items.length > 0) {
       // Cabecera de columnas
+      const showUnidad = sec.key === "materiales";
       sheet.setRowHeight(r, 20);
-      sheet.getRange(r, 1, 1, 7)
-        .setValues([["ÍTEM", "DESCRIPCIÓN", "UNIDAD", "CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"]])
-        .setBackground(GRIS_CLR).setFontColor("#333333")
-        .setFontWeight("bold").setFontSize(8)
-        .setHorizontalAlignment("center").setVerticalAlignment("middle")
-        .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      if (showUnidad) {
+        sheet.getRange(r, 1, 1, 7)
+          .setValues([["ÍTEM", "DESCRIPCIÓN", "UNIDAD", "CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"]])
+          .setBackground(GRIS_CLR).setFontColor("#333333")
+          .setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      } else {
+        sheet.getRange(r, 1).setValue("ÍTEM")
+          .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, true, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 2, 1, 2).merge().setValue("DESCRIPCIÓN")
+          .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        ["CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"].forEach((h, i) => {
+          sheet.getRange(r, 4 + i).setValue(h)
+            .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+            .setHorizontalAlignment("center").setVerticalAlignment("middle")
+            .setBorder(true, null, true, i === 3, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        });
+      }
       r++;
 
       items.forEach((it, idx) => {
@@ -262,10 +314,15 @@ function _llenarHojaAPU(sheet, apu, ss) {
         const bg   = idx % 2 === 0 ? "#ffffff" : "#fafafa";
         sheet.getRange(r, 1).setValue(idx + 1)
           .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
-        sheet.getRange(r, 2).setValue(it.descripcion_manual || "—")
-          .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
-        sheet.getRange(r, 3).setValue(it.unidad || "")
-          .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        if (showUnidad) {
+          sheet.getRange(r, 2).setValue(it.descripcion_manual || "—")
+            .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
+          sheet.getRange(r, 3).setValue(it.unidad || "")
+            .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        } else {
+          sheet.getRange(r, 2, 1, 2).merge().setValue(it.descripcion_manual || "—")
+            .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
+        }
         sheet.getRange(r, 4).setValue(it.cantidad || 0)
           .setFontSize(8).setHorizontalAlignment("right").setVerticalAlignment("middle");
         sheet.getRange(r, 5).setValue(rend)
@@ -528,6 +585,19 @@ function getAPUCompleto(apuId) {
       });
       return o;
     });
+
+  // Enrich items with unidad from BD (APU_Items doesn't store it)
+  const matUnidad  = {};
+  sheetToObjects(ss, "Materiales").forEach(m => { matUnidad[String(m.id)] = m.unidad || ""; });
+  const otroUnidad = {};
+  sheetToObjects(ss, "Otros").forEach(o => { otroUnidad[String(o.id)] = o.unidad || ""; });
+  items.forEach(item => {
+    if (!item.unidad) {
+      if      (item.tipo === "MATERIAL")                              item.unidad = matUnidad[String(item.recurso_id)] || "";
+      else if (item.tipo === "EQUIPO" || item.tipo === "MANO_OBRA")  item.unidad = "Día";
+      else if (item.tipo === "OTRO")                                  item.unidad = otroUnidad[String(item.recurso_id)] || "";
+    }
+  });
 
   apu.equipos    = items.filter(i => i.tipo === "EQUIPO");
   apu.materiales = items.filter(i => i.tipo === "MATERIAL");

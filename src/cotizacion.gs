@@ -48,12 +48,9 @@ function descargarPDFBase64(cotId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
-  const pdfBytes = UrlFetchApp.fetch(url, {
+  const xlsxBytes = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
   }).getContent();
 
@@ -62,9 +59,9 @@ function descargarPDFBase64(cotId) {
   const slug = (cot.cliente || "cotizacion")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
-  const fileName = (cot.numero_oferta || "OF") + "_" + slug + ".pdf";
+  const fileName = (cot.numero_oferta || "OF") + "_" + slug + ".xlsx";
 
-  return { ok: true, base64: Utilities.base64Encode(pdfBytes), fileName };
+  return { ok: true, base64: Utilities.base64Encode(xlsxBytes), fileName };
 }
 
 // ─── EXPORTAR PDF ────────────────────────────────────────────────────────────
@@ -83,10 +80,7 @@ function exportarCotizacionPDF(cotId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
   const response = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -102,7 +96,7 @@ function exportarCotizacionPDF(cotId) {
   const slug   = (cot.cliente || "sin_cliente")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
-  const fileName = `${dia}-${mes}-${anio}_${hora}-${min}_${slug}.pdf`;
+  const fileName = `${dia}-${mes}-${anio}_${hora}-${min}_${slug}.xlsx`;
 
   const folder = obtenerCarpetaPDF();
   const file   = folder.createFile(response.getBlob().setName(fileName));
@@ -283,18 +277,25 @@ function llenarHojaCotizacion(sheet, cot) {
       subitems.forEach((it, i) => {
         sheet.setRowHeight(r, 17);
         const bg = i % 2 === 0 ? "#ffffff" : "#fafafa";
-        const rend = (it.rendimiento !== null && it.rendimiento !== undefined && it.rendimiento !== "") ? it.rendimiento : "";
-        const cantTexto = (it.cantidad != null ? String(it.cantidad) : "") + (rend ? "  /  " + rend : "");
+        const cantTexto = it.cantidad != null ? it.cantidad : "";
+        const mostrarUnidad = sec.key === "materiales";
         sheet.getRange(r, 1).setValue("").setBackground(bg)
           .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
-        sheet.getRange(r, 2).setValue("      " + (it.descripcion_manual || "—"))
-          .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
-          .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
-          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
-        sheet.getRange(r, 3).setValue(it.unidad || "")
-          .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("center")
-          .setVerticalAlignment("middle").setBackground(bg)
-          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        if (mostrarUnidad) {
+          sheet.getRange(r, 2).setValue("      " + (it.descripcion_manual || "—"))
+            .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
+            .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+          sheet.getRange(r, 3).setValue(it.unidad || "")
+            .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("center")
+            .setVerticalAlignment("middle").setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        } else {
+          sheet.getRange(r, 2, 1, 2).merge().setValue("      " + (it.descripcion_manual || "—"))
+            .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
+            .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        }
         sheet.getRange(r, 4).setValue(cantTexto)
           .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("right")
           .setVerticalAlignment("middle").setBackground(bg)
@@ -534,6 +535,21 @@ function getCotizacionCompleta(cotId) {
       aih.forEach((h, i) => o[h] = r[i]);
       return o;
     });
+
+    // Build unidad lookup from BD (APU_Items doesn't store unidad)
+    const matUnidad  = {};
+    sheetToObjects(ss, "Materiales").forEach(m => { matUnidad[String(m.id)] = m.unidad || ""; });
+    const otroUnidad = {};
+    sheetToObjects(ss, "Otros").forEach(o => { otroUnidad[String(o.id)] = o.unidad || ""; });
+
+    allApuItems.forEach(ai => {
+      if (!ai.unidad) {
+        if      (ai.tipo === "MATERIAL")                         ai.unidad = matUnidad[String(ai.recurso_id)] || "";
+        else if (ai.tipo === "EQUIPO" || ai.tipo === "MANO_OBRA") ai.unidad = "Día";
+        else if (ai.tipo === "OTRO")                             ai.unidad = otroUnidad[String(ai.recurso_id)] || "";
+      }
+    });
+
     cot.items.forEach(item => {
       const subs      = allApuItems.filter(ai => String(ai.apu_id) === String(item.apu_id));
       item.equipos    = subs.filter(i => i.tipo === "EQUIPO");
