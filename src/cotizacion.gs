@@ -142,8 +142,8 @@ function llenarHojaCotizacion(sheet, cot) {
   const noIncluye     = String(cot.no_incluye     || "").trim();
 
   const MONEY    = '"$"#,##0';
-  const NEGRO    = "#1a1a1a";
-  const GRIS_OSC = "#424242";
+  const NEGRO    = "#a8a8a8";
+  const GRIS_OSC = "#c8c8c8";
   const GRIS_MED = "#9e9e9e";
   const GRIS_CLR = "#f5f5f5";
   const BORDE    = "#dddddd";
@@ -210,7 +210,7 @@ function llenarHojaCotizacion(sheet, cot) {
   sheet.setRowHeight(r, 26);
   sheet.getRange(r, 1, 1, NC)
     .setValues([["ÍTEM", "DESCRIPCIÓN", "UND", "CANT.", "VR. UNITARIO", "VR. TOTAL"]])
-    .setBackground(NEGRO).setFontColor("#ffffff").setFontWeight("bold").setFontSize(9)
+    .setBackground(NEGRO).setFontColor("#1a1a1a").setFontWeight("bold").setFontSize(9)
     .setHorizontalAlignment("center").setVerticalAlignment("middle")
     .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   r++;
@@ -242,19 +242,19 @@ function llenarHojaCotizacion(sheet, cot) {
       .setBackground(GRIS_OSC)
       .setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(r, 1).setValue(idx + 1)
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("center").setVerticalAlignment("middle");
     sheet.getRange(r, 2).setValue((item.codigo_item ? "[" + item.codigo_item + "]  " : "") + (item.descripcion || ""))
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
     sheet.getRange(r, 3).setValue(item.unidad || "")
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("center").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("center").setVerticalAlignment("middle");
     sheet.getRange(r, 4).setValue(cant)
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("right").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("right").setVerticalAlignment("middle");
     sheet.getRange(r, 5).setValue(precio).setNumberFormat(MONEY)
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("right").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("right").setVerticalAlignment("middle");
     sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("right").setVerticalAlignment("middle");
     r++;
 
@@ -332,11 +332,11 @@ function llenarHojaCotizacion(sheet, cot) {
   sheet.setRowHeight(r, 24);
   sheet.getRange(r, 1, 1, 5).merge()
     .setValue("TOTAL COSTOS DIRECTOS")
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(GRIS_OSC)
     .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   sheet.getRange(r, 6).setValue(valorNeto).setNumberFormat(MONEY)
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(GRIS_OSC)
     .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   r++;
@@ -373,11 +373,11 @@ function llenarHojaCotizacion(sheet, cot) {
   sheet.setRowHeight(r, 28);
   sheet.getRange(r, 1, 1, 5).merge()
     .setValue("VALOR TOTAL OFERTA")
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
     .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
     .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   r++;
@@ -388,7 +388,7 @@ function llenarHojaCotizacion(sheet, cot) {
     sheet.setRowHeight(r, 22);
     sheet.getRange(r, 1, 1, NC).merge()
       .setValue("CONDICIONES COMERCIALES")
-      .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
       .setBackground(GRIS_OSC)
       .setHorizontalAlignment("left").setVerticalAlignment("middle");
     r++;

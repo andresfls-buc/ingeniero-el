@@ -3,11 +3,15 @@ function createSheet(ss, name, headers) {
 
   if (!sheet) {
     sheet = ss.insertSheet(name);
-  } else {
-    sheet.clear();
+    sheet.appendRow(headers);
+    return;
   }
 
-  sheet.appendRow(headers);
+  // Only reset if there's no data (header-only or completely empty)
+  if (sheet.getLastRow() < 2) {
+    sheet.clear();
+    sheet.appendRow(headers);
+  }
 }
 
 // Lee la hoja "Configuracion" y devuelve un objeto { clave: valor }
