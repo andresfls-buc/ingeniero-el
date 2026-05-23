@@ -175,8 +175,8 @@ function descargarAPUBase64(apuId) {
 
 function _llenarHojaAPU(sheet, apu, ss) {
   const MONEY    = '"$"#,##0';
-  const NEGRO    = "#1a1a1a";
-  const GRIS_OSC = "#424242";
+  const NEGRO    = "#a8a8a8";
+  const GRIS_OSC = "#c8c8c8";
   const GRIS_CLR = "#f5f5f5";
   const BORDE    = "#dddddd";
   const cfg      = getConfig();
@@ -274,7 +274,7 @@ function _llenarHojaAPU(sheet, apu, ss) {
     sheet.setRowHeight(r, 24);
     sheet.getRange(r, 1, 1, 7).merge()
       .setValue(sec.label)
-      .setBackground(GRIS_OSC).setFontColor("#ffffff")
+      .setBackground(GRIS_OSC).setFontColor("#333333")
       .setFontWeight("bold").setFontSize(9)
       .setHorizontalAlignment("left").setVerticalAlignment("middle");
     r++;
@@ -370,11 +370,11 @@ function _llenarHojaAPU(sheet, apu, ss) {
   const costoNeto = parseFloat(apu.costo_neto) || 0;
   sheet.getRange(r, 1, 1, 6).merge()
     .setValue("COSTOS DIRECTOS  (A + B + C + D)")
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   sheet.getRange(r, 7).setValue(costoNeto)
-    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   r++;
@@ -383,9 +383,9 @@ function _llenarHojaAPU(sheet, apu, ss) {
   sheet.setRowHeight(r, 18);
   sheet.getRange(r, 1, 1, 7).merge()
     .setValue("COSTOS INDIRECTOS")
-    .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(9).setFontWeight("bold").setFontColor("#333333")
     .setHorizontalAlignment("left").setVerticalAlignment("middle")
-    .setBackground("#37474f");
+    .setBackground("#c8c8c8");
   r++;
 
   // Filas de indirectos
@@ -425,11 +425,11 @@ function _llenarHojaAPU(sheet, apu, ss) {
   sheet.setRowHeight(r, 30);
   sheet.getRange(r, 1, 1, 6).merge()
     .setValue("VALOR UNITARIO TOTAL")
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   sheet.getRange(r, 7).setValue(valorTotal)
-    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
 }
@@ -457,18 +457,111 @@ function eliminarAPU(apuId) {
 // ─── LISTA DE APUs ────────────────────────────────────────────────────────────
 
 function listarAPUs() {
-  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
-  return items.map(a => ({
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("APU");
+
+  // Si la hoja APU está vacía pero hay datos en otras tablas, reconstruir automáticamente
+  if (!sheet || sheet.getLastRow() < 2) {
+    reconstruirAPUsDesdeItems();
+  }
+
+  return sheetToObjects(ss, "APU").map(a => ({
     id:          a.id,
     codigo_item: a.codigo_item,
     descripcion: a.descripcion,
     unidad:      a.unidad,
     cliente:     a.cliente,
-    direccion:   a.direccion   || "",
+    direccion:   a.direccion || "",
     actividad:   a.actividad,
     costo_neto:  a.costo_neto,
     fecha:       String(a.fecha || ""),
   }));
+}
+
+// ─── RECONSTRUIR APUs DESDE DATOS EXISTENTES ──────────────────────────────────
+// Recupera APUs usando Cotizacion_Items (descripcion, cliente, costo) + APU_Items (subtotales)
+
+function reconstruirAPUsDesdeItems() {
+  const ss       = SpreadsheetApp.getActiveSpreadsheet();
+  const apuSheet = ss.getSheetByName("APU");
+
+  if (!apuSheet) return { ok: false, error: "Hoja 'APU' no encontrada." };
+  if (apuSheet.getLastRow() >= 2) return { ok: false, error: "La hoja APU ya tiene datos." };
+
+  // Recolectar IDs desde APU_Items y Cotizacion_Items
+  const apuItemsAll = sheetToObjects(ss, "APU_Items");
+  const cotItemsAll = sheetToObjects(ss, "Cotizacion_Items");
+
+  const apuIds = new Set();
+  apuItemsAll.forEach(i => { if (i.apu_id) apuIds.add(String(i.apu_id)); });
+  cotItemsAll.forEach(i => { if (i.apu_id) apuIds.add(String(i.apu_id)); });
+
+  if (!apuIds.size) return { ok: false, error: "No se encontraron APUs en APU_Items ni en Cotizacion_Items. No hay datos para recuperar." };
+
+  // Lookup de cotizaciones para obtener el cliente
+  const cotizaciones = sheetToObjects(ss, "Cotizaciones");
+  const cotById = {};
+  cotizaciones.forEach(c => { cotById[String(c.id)] = c; });
+
+  // Mejor info de cada APU desde Cotizacion_Items (descripcion, unidad, cliente, precio)
+  const infoByApu = {};
+  cotItemsAll.forEach(ci => {
+    const aid = String(ci.apu_id);
+    if (!infoByApu[aid]) {
+      const cot = cotById[String(ci.cotizacion_id)] || {};
+      infoByApu[aid] = {
+        descripcion: ci.descripcion || "",
+        unidad:      ci.unidad      || "",
+        precio_apu:  parseFloat(ci.precio_apu) || 0,
+        cliente:     cot.cliente    || "",
+      };
+    }
+  });
+
+  // Subtotales desde APU_Items
+  const subsByApu = {};
+  apuItemsAll.forEach(item => {
+    const aid = String(item.apu_id);
+    if (!subsByApu[aid]) subsByApu[aid] = { EQUIPO: 0, MATERIAL: 0, MANO_OBRA: 0, OTRO: 0 };
+    subsByApu[aid][item.tipo] = (subsByApu[aid][item.tipo] || 0) + (parseFloat(item.valor_parcial) || 0);
+  });
+
+  const apuHeaders = apuSheet.getRange(1, 1, 1, apuSheet.getLastColumn()).getValues()[0];
+  const fecha      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+
+  [...apuIds].sort((a, b) => Number(a) - Number(b)).forEach(apuId => {
+    const info   = infoByApu[apuId] || {};
+    const subs   = subsByApu[apuId] || {};
+    const subEq  = subs.EQUIPO    || 0;
+    const subMat = subs.MATERIAL  || 0;
+    const subMo  = subs.MANO_OBRA || 0;
+    const subOt  = subs.OTRO      || 0;
+    const neto   = info.precio_apu || (subEq + subMat + subMo + subOt);
+
+    const valores = {
+      id:                  Number(apuId),
+      codigo_item:         info.descripcion || ("APU-" + apuId),
+      descripcion:         info.descripcion || ("APU-" + apuId),
+      unidad:              info.unidad      || "",
+      cliente:             info.cliente     || "",
+      direccion:           "",
+      actividad:           info.descripcion || "",
+      subtotal_equipos:    subEq,
+      subtotal_materiales: subMat,
+      subtotal_mano_obra:  subMo,
+      subtotal_otros:      subOt,
+      costo_neto:          neto,
+      administracion_pct:  0,
+      imprevistos_pct:     0,
+      utilidad_pct:        0,
+      iva_pct:             19,
+      valor_total:         neto,
+      fecha:               fecha,
+    };
+    apuSheet.appendRow(apuHeaders.map(h => (valores[h] !== undefined ? valores[h] : "")));
+  });
+
+  return { ok: true, count: apuIds.size };
 }
 
 // ─── CREAR APU ────────────────────────────────────────────────────────────────
