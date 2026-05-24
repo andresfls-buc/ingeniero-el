@@ -309,7 +309,6 @@ function _llenarHojaAPU(sheet, apu, ss) {
       r++;
 
       items.forEach((it, idx) => {
-        sheet.setRowHeight(r, 20);
         const rend = (it.rendimiento !== null && it.rendimiento !== "") ? it.rendimiento : "—";
         const bg   = idx % 2 === 0 ? "#ffffff" : "#fafafa";
         sheet.getRange(r, 1).setValue(idx + 1)
