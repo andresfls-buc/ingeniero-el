@@ -275,7 +275,6 @@ function llenarHojaCotizacion(sheet, cot) {
 
       // Ítems de la sección
       subitems.forEach((it, i) => {
-        sheet.setRowHeight(r, 17);
         const bg = i % 2 === 0 ? "#ffffff" : "#fafafa";
         const cantTexto = it.cantidad != null ? it.cantidad : "";
         const mostrarUnidad = sec.key === "materiales";
@@ -310,6 +309,22 @@ function llenarHojaCotizacion(sheet, cot) {
           .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
         r++;
       });
+
+      // Subtotal de sección
+      const secSubtotal = subitems.reduce((s, it) => s + (parseFloat(it.valor_parcial) || 0), 0);
+      sheet.setRowHeight(r, 20);
+      sheet.getRange(r, 1, 1, 5).merge()
+        .setValue("Subtotal " + sec.label)
+        .setFontSize(8).setFontWeight("bold").setFontColor("#333333")
+        .setHorizontalAlignment("right").setVerticalAlignment("middle")
+        .setBackground(GRIS_CLR)
+        .setBorder(true, true, true, null, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+      sheet.getRange(r, 6).setValue(secSubtotal).setNumberFormat(MONEY)
+        .setFontSize(8).setFontWeight("bold").setFontColor("#111111")
+        .setHorizontalAlignment("right").setVerticalAlignment("middle")
+        .setBackground(GRIS_CLR)
+        .setBorder(true, null, true, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+      r++;
     });
 
     // Fila de subtotal del APU
