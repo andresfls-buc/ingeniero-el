@@ -725,9 +725,9 @@ function enviarCotizacionEmail(cotId, emailDestino) {
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
       + "/export?format=pdf&gid=" + tmp.getSheetId()
-      + "&portrait=true&fitw=true&size=letter"
+      + "&portrait=true&scale=4&size=letter"
       + "&gridlines=false&printtitle=false&sheetnames=false"
-      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+      + "&top_margin=0.50&bottom_margin=0.50&left_margin=0.50&right_margin=0.50";
 
     const blob = UrlFetchApp.fetch(exportUrl, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -802,9 +802,9 @@ function enviarYGuardarPDF(cotId, emailDestino) {
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
       + "/export?format=pdf&gid=" + tmp.getSheetId()
-      + "&portrait=true&fitw=true&size=letter"
+      + "&portrait=true&scale=4&size=letter"
       + "&gridlines=false&printtitle=false&sheetnames=false"
-      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+      + "&top_margin=0.50&bottom_margin=0.50&left_margin=0.50&right_margin=0.50";
 
     const pdfBlob = UrlFetchApp.fetch(exportUrl, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
