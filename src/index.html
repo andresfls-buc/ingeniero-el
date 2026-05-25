@@ -278,7 +278,9 @@
       display: flex;
       flex-direction: column;
       box-shadow: 0 8px 32px rgba(0,0,0,.2);
+      overflow: hidden;
     }
+    .modal-results { min-height: 0; }
     .modal-header {
       display: flex;
       align-items: center;
@@ -385,52 +387,88 @@
 
     /* ── RESPONSIVE MOBILE ── */
     @media (max-width: 640px) {
-      .toolbar { flex-wrap: wrap; gap: 6px; padding: 10px 12px; }
-      .toolbar h1, .toolbar h2 { font-size: 13px; flex-basis: 100%; order: -1; margin: 0; }
-      .tab-group { order: 1; }
-      .estado-tag { font-size: 10px; }
-      .btn { font-size: 11px; padding: 5px 10px; }
 
-      .container { padding: 8px 6px; }
+      /* ── Toolbar ── */
+      .toolbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+      .toolbar h1, .toolbar h2 { font-size: 14px; flex-basis: 100%; order: -1; margin: 0; }
+      .tab-group { order: 1; gap: 4px; }
+      .tab-btn { font-size: 13px; padding: 8px 14px; min-height: 40px; }
+      .estado-tag { font-size: 12px; }
+      .btn { font-size: 13px; padding: 9px 14px; min-height: 40px; }
+      .btn-back { padding: 7px 12px; min-height: 36px; }
+      .btn-add { font-size: 12px; padding: 8px 12px; min-height: 36px; }
 
-      /* Cards scrollables en horizontal */
+      /* ── Layout ── */
+      .container { padding: 10px 8px; }
       .card { overflow-x: auto; border-radius: 4px; }
 
-      /* Tablas: texto más pequeño */
-      .apu-table thead th, .apu-table td { padding: 5px 7px; font-size: 11px; }
-      .apu-table .cell-input { font-size: 11px; padding: 3px 4px; }
-      .list-table thead th, .list-table td { padding: 7px 8px; font-size: 11px; }
+      /* ── Section headers & subtotals ── */
+      .sec-header { font-size: 12px; padding: 10px 12px; }
+      .subtotal-row { font-size: 13px; padding: 10px 12px; }
 
-      /* Formulario: una sola columna */
-      .form-grid { grid-template-columns: 1fr !important; gap: 8px; padding: 10px; }
+      /* ── Form inputs: 16px prevents iOS auto-zoom ── */
+      .form-group label { font-size: 11px; }
+      .form-group input,
+      .form-group select,
+      .form-group textarea { font-size: 16px !important; padding: 10px; min-height: 44px; }
+      .form-grid { grid-template-columns: 1fr !important; gap: 10px; padding: 12px; }
 
-      /* Totales */
-      .totales-body { padding: 8px 10px; }
-      .total-val { min-width: 80px; font-size: 11px; }
-      .pct-input { width: 44px; font-size: 11px; }
-      .total-row { font-size: 11px; }
+      /* ── APU item tables ── */
+      .apu-table thead th { padding: 7px 8px; font-size: 11px; }
+      .apu-table td { padding: 6px 8px; font-size: 13px; }
+      .cell-input { font-size: 16px !important; padding: 8px 6px; min-height: 40px; }
 
-      /* Modales: hoja desde abajo */
+      /* ── List tables (APUs, Cotizaciones) ── */
+      .list-table thead th { padding: 10px 10px; font-size: 12px; }
+      .list-table td { padding: 12px 10px; font-size: 14px; }
+      .btn-open { font-size: 13px; padding: 9px 12px; min-height: 40px;
+                  display: inline-flex; align-items: center; }
+      .btn-del  { font-size: 18px; padding: 4px 8px; min-height: 40px; min-width: 36px; }
+
+      /* ── Totales / AIU ── */
+      .totales-body { padding: 10px 12px; }
+      .total-row { font-size: 13px; padding: 8px 0; }
+      .total-row.final { font-size: 15px; }
+      .total-val { min-width: 100px; font-size: 13px; }
+      .pct-input { width: 58px; font-size: 16px !important; padding: 7px 4px; min-height: 40px; }
+
+      /* ── Action buttons (bottom bar) ── */
+      .actions-bar { flex-direction: column; gap: 10px; padding: 14px 0 6px; }
+      .actions-bar .btn,
+      .actions-bar button { width: 100%; text-align: center; box-sizing: border-box; }
+      .btn-action { font-size: 14px; padding: 14px 20px; min-height: 50px; }
+
+      /* ── Modals: slide up from bottom ── */
       #modal, #modal-bd, #modal-apu { padding: 0; align-items: flex-end; }
-      .modal-box { max-width: 100%; border-radius: 10px 10px 0 0; max-height: 92vh; }
-      .modal-filtros { flex-wrap: wrap; gap: 6px; }
+      .modal-box { max-width: 100%; border-radius: 12px 12px 0 0; max-height: 92vh; }
+      .modal-header { padding: 16px 18px; }
+      .modal-header h3 { font-size: 15px; }
+      .btn-close { font-size: 22px; padding: 4px 8px; min-height: 44px; min-width: 44px; }
+      .modal-filtros { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+      .modal-filtros input,
+      .modal-filtros select { font-size: 16px !important; padding: 10px 12px; min-height: 44px; }
+      .modal-table thead th { padding: 8px 12px; font-size: 11px; }
+      .modal-table td { padding: 12px 12px; font-size: 14px; }
+      .btn-sel { padding: 10px 14px; font-size: 13px; min-height: 40px; }
 
-      /* Diálogos confirm/prompt: full width */
+      /* ── Dialogs (confirm / prompt) ── */
       .dlg-overlay { padding: 12px; align-items: center; }
       .dlg-box { max-width: 100%; }
+      .dlg-body { padding: 22px 20px 14px; }
+      .dlg-msg { font-size: 15px; line-height: 1.6; }
+      .dlg-input { font-size: 16px !important; padding: 12px; min-height: 48px; margin-top: 14px; }
+      .dlg-footer { flex-direction: column; gap: 8px; padding: 14px 20px; }
+      .dlg-btn-cancel,
+      .dlg-btn-ok { width: 100%; font-size: 15px; padding: 14px; border-radius: 6px; }
 
-      /* Toast: ancho completo abajo */
-      #toast-container { top: auto !important; bottom: 12px; right: 8px; left: 8px; max-width: 100%; }
+      /* ── Toast: full width at bottom ── */
+      #toast-container { top: auto !important; bottom: 12px; right: 8px; left: 8px;
+                         max-width: 100%; }
 
-      /* Botones de acción: apilados */
-      .actions-bar { flex-direction: column; }
-      .actions-bar .btn, .actions-bar button { width: 100%; text-align: center; box-sizing: border-box; }
-
-      /* BD form: columnas flexibles */
-      #bd-form-fields > div[style*="grid-template-columns"] { grid-template-columns: 1fr 1fr !important; }
-
-      .subtotal-row { font-size: 11px; padding: 6px 10px; }
-      .sec-header { font-size: 10px; padding: 7px 10px; }
+      /* ── BD form ── */
+      #bd-form-fields > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr 1fr !important;
+      }
     }
   </style>
 </head>
@@ -445,6 +483,7 @@
     <div class="tab-group">
       <button class="tab-btn active" id="tab-apus" onclick="irTabAPUs()">APUs</button>
       <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Cotizaciones</button>
+      <button class="tab-btn" id="tab-archivos" onclick="irTabArchivos()">Mis Archivos</button>
     </div>
     <button class="btn btn-back" onclick="abrirGestionarBD()" style="border-color:rgba(255,255,255,0.5)">⚙ BD de Precios</button>
     <button class="btn btn-primary" id="btn-nuevo" onclick="nuevoActual()">+ Nuevo APU</button>
@@ -638,7 +677,7 @@
 
     <div class="actions-bar">
       <button class="btn-action btn-naranja" id="btn-dl-apu" onclick="descargarAPU()">
-        ⬇ Descargar APU
+        ⬇ Descargar APU (.xlsx)
       </button>
       <button class="btn-action btn-azul" id="btn-guardar-apu-2" onclick="guardarAPUManual()">
         💾 Guardar APU en Drive
@@ -786,10 +825,10 @@
 
     <div class="actions-bar">
       <button class="btn-action btn-naranja" id="btn-pdf" onclick="descargarPDF()">
-        ⬇ Descargar PDF
+        ⬇ Descargar Cotización (.xlsx)
       </button>
       <button class="btn-action btn-celeste" id="btn-email" onclick="enviarPorCorreo()">
-        ✉ Enviar y guardar PDF
+        ✉ Enviar y guardar Excel
       </button>
     </div>
 
@@ -876,12 +915,16 @@
       <h3>Seleccionar APU</h3>
       <button class="btn-close" onclick="cerrarModalAPU()">✕</button>
     </div>
+    <div class="modal-filtros">
+      <input id="modal-apu-search" type="text" placeholder="Buscar por ítem, cliente o actividad..." oninput="filtrarModalAPUs()" style="flex:1">
+      <span id="modal-apu-count" style="font-size:11px;color:#999;white-space:nowrap;align-self:center"></span>
+    </div>
     <div class="modal-results">
       <table class="modal-table">
         <thead>
           <tr>
             <th>ÍTEM</th><th>CLIENTE / OBRA</th><th>ACTIVIDAD</th>
-            <th class="num">COSTO NETO</th><th></th>
+            <th class="num">COSTO NETO</th><th></th><th style="width:32px"></th>
           </tr>
         </thead>
         <tbody id="modal-apu-tbody"></tbody>
@@ -1052,6 +1095,7 @@
   }
 
   function renderFormulario(apu) {
+    btnSetEstado("btn-crear-cot", "idle", "Crear Cotización con este APU →");
     document.getElementById("apu-titulo").textContent  = "APU — " + (apu.cliente || apu.codigo_item || "#" + apu.id);
     document.getElementById("f-cliente").value   = apu.cliente     || "";
     document.getElementById("f-direccion").value = apu.direccion   || "";
@@ -1083,26 +1127,27 @@
     ["sub-equipos","sub-materiales","sub-mano-obra","sub-otros","costo-directo",
      "val-adm","val-imp","val-util","subtotal-indirectos","valor-unitario-total"]
       .forEach(id => document.getElementById(id).textContent = COP(0));
+    btnSetEstado("btn-crear-cot", "idle", "Crear Cotización con este APU →");
   }
 
   // ═══ GUARDAR CABEZA ═══════════════════════════════════════════════════════
-  // Solo actualiza si ya existe el APU. La creación la maneja asegurarAPUluego().
   function guardarCabeza() {
-    if (!apuActual) return;
-    const datos = {
-      codigo_item:        document.getElementById("f-item").value,
-      descripcion:        document.getElementById("f-item").value,
-      unidad:             document.getElementById("f-unidad").value,
-      cliente:            document.getElementById("f-cliente").value,
-      direccion:          document.getElementById("f-direccion").value || "",
-      actividad:          document.getElementById("f-actividad").value,
-      administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
-      imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
-      utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
-    };
-    google.script.run
-      .withSuccessHandler(() => setEstado("Guardado ✓"))
-      .actualizarCabezaAPU(apuActual, datos);
+    asegurarAPUluego(() => {
+      const datos = {
+        codigo_item:        document.getElementById("f-item").value,
+        descripcion:        document.getElementById("f-item").value,
+        unidad:             document.getElementById("f-unidad").value,
+        cliente:            document.getElementById("f-cliente").value,
+        direccion:          document.getElementById("f-direccion").value || "",
+        actividad:          document.getElementById("f-actividad").value,
+        administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
+        imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
+        utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
+      };
+      google.script.run
+        .withSuccessHandler(() => setEstado("Guardado ✓"))
+        .actualizarCabezaAPU(apuActual, datos);
+    });
   }
 
   function guardarAPUManual() {
@@ -1161,15 +1206,15 @@
 
   function descargarAPU() {
     if (!apuActual) { showToast("Guarda el APU primero.", "warning"); return; }
-    btnSetEstado("btn-dl-apu", "loading", "⏳ Generando PDF...");
+    btnSetEstado("btn-dl-apu", "loading", "⏳ Generando Excel...");
     google.script.run
       .withSuccessHandler(res => {
         if (!res.ok) {
           btnSetEstado("btn-dl-apu", "error", "✕ Error al generar");
-          showToast("Error generando PDF: " + res.error, "error");
+          showToast("Error generando Excel: " + res.error, "error");
           return;
         }
-        const blob = b64toBlob(res.base64, "application/pdf");
+        const blob = b64toBlob(res.base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement("a");
         a.href     = url;
@@ -1177,7 +1222,7 @@
         a.click();
         URL.revokeObjectURL(url);
         btnSetEstado("btn-dl-apu", "success", "✓ Descargado");
-        showAlert("PDF Descargado", "El APU fue descargado exitosamente.\n" + res.fileName, "success");
+        showAlert("Excel Descargado", "El APU fue descargado exitosamente.\n" + res.fileName, "success");
       })
       .withFailureHandler(err => {
         btnSetEstado("btn-dl-apu", "error", "✕ Error");
@@ -1206,6 +1251,7 @@
           .withSuccessHandler(() => {
             google.script.run
               .withSuccessHandler(cot => {
+                btnSetEstado("btn-crear-cot", "idle", "Crear Cotización con este APU →");
                 tabActual = "cots";
                 document.getElementById("tab-cots").classList.add("active");
                 document.getElementById("tab-apus").classList.remove("active");
@@ -1218,13 +1264,22 @@
                 renderCotizacion(cot);
                 setCotEstado("Guardado ✓");
               })
-              .withFailureHandler(err => showToast("Error cargando cotización: " + err.message, "error"))
+              .withFailureHandler(err => {
+                btnSetEstado("btn-crear-cot", "error", "✕ Error");
+                showToast("Error cargando cotización: " + err.message, "error");
+              })
               .getCotizacionCompleta(cotId);
           })
-          .withFailureHandler(err => showToast("Error agregando APU: " + err.message, "error"))
+          .withFailureHandler(err => {
+            btnSetEstado("btn-crear-cot", "error", "✕ Error");
+            showToast("Error agregando APU: " + err.message, "error");
+          })
           .agregarAPUaCotizacion(cotId, apuActual, 1);
       })
-      .withFailureHandler(err => showToast("Error creando cotización: " + err.message, "error"))
+      .withFailureHandler(err => {
+        btnSetEstado("btn-crear-cot", "error", "✕ Error");
+        showToast("Error creando cotización: " + err.message, "error");
+      })
       .crearCotizacion(datos);
   }
 
@@ -1630,7 +1685,9 @@
     tabActual = "apus";
     document.getElementById("tab-apus").classList.add("active");
     document.getElementById("tab-cots").classList.remove("active");
+    document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nuevo APU";
+    document.getElementById("btn-nuevo").style.display = "";
     document.getElementById("v-apu").style.display = "none";
     document.getElementById("v-cot").style.display = "none";
     document.getElementById("v-lista").style.display = "";
@@ -1641,7 +1698,9 @@
     tabActual = "cots";
     document.getElementById("tab-cots").classList.add("active");
     document.getElementById("tab-apus").classList.remove("active");
+    document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
+    document.getElementById("btn-nuevo").style.display = "";
     document.getElementById("v-apu").style.display = "none";
     document.getElementById("v-cot").style.display = "none";
     document.getElementById("v-lista").style.display = "";
@@ -1811,11 +1870,12 @@
       subitems.forEach(it => {
         const cant  = it.cantidad    != null ? it.cantidad    : "—";
         const rend  = it.rendimiento != null && it.rendimiento !== "" ? it.rendimiento : "—";
+        const mostrarUnidad = sec.key === "materiales";
         html += `<tr class="crow-detail" data-cotitem-id="${cotItemId}" style="background:#fafafa">
           <td></td>
           <td></td>
-          <td style="padding-left:32px;font-size:11px;color:#333">${it.descripcion_manual || "—"}</td>
-          <td style="text-align:center;font-size:11px;color:#555">${it.unidad || ""}</td>
+          <td ${mostrarUnidad ? "" : 'colspan="2"'} style="padding-left:32px;font-size:11px;color:#333">${it.descripcion_manual || "—"}</td>
+          ${mostrarUnidad ? `<td style="text-align:center;font-size:11px;color:#555">${it.unidad || ""}</td>` : ""}
           <td style="text-align:right;font-size:11px;color:#555">${cant} <small style="color:#aaa">(rend: ${rend})</small></td>
           <td style="text-align:right;font-size:11px;color:#555">${COP(it.precio_unitario)}</td>
           <td style="text-align:right;font-size:11px;color:#444;font-weight:600">${COP(it.valor_parcial)}</td>
@@ -1955,18 +2015,54 @@
   }
 
   function renderModalAPUs(apus) {
+    todosLosAPUs = apus || [];
+    filtrarModalAPUs();
+    setTimeout(() => document.getElementById("modal-apu-search")?.focus(), 80);
+  }
+
+  function filtrarModalAPUs() {
+    const q = (document.getElementById("modal-apu-search")?.value || "").toLowerCase().trim();
+    const filtrados = q
+      ? todosLosAPUs.filter(a =>
+          (a.codigo_item || "").toLowerCase().includes(q) ||
+          (a.cliente     || "").toLowerCase().includes(q) ||
+          (a.actividad   || "").toLowerCase().includes(q)
+        )
+      : todosLosAPUs;
+
+    const countEl = document.getElementById("modal-apu-count");
+    if (countEl) countEl.textContent = filtrados.length + " / " + todosLosAPUs.length + " APUs";
+
     const tbody = document.getElementById("modal-apu-tbody");
-    if (!apus || apus.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888">No hay APUs creados</td></tr>';
+    if (!todosLosAPUs.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#888">No hay APUs guardados. Ve al tab <strong>APUs</strong> y crea uno primero.</td></tr>';
       return;
     }
-    tbody.innerHTML = apus.map(a => `<tr>
+    if (!filtrados.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#888">Sin resultados para esa búsqueda.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtrados.map(a => `<tr>
       <td class="mono">${a.codigo_item || '—'}</td>
       <td>${a.cliente || a.descripcion || '—'}</td>
       <td>${a.actividad || '—'}</td>
       <td class="num">${COP(a.costo_neto)}</td>
       <td><button class="btn-sel" onclick="seleccionarAPU(${a.id})">Agregar</button></td>
+      <td><button class="btn-del" title="Eliminar APU" onclick="eliminarAPUDesdeModal(${a.id}, '${(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button></td>
     </tr>`).join("");
+  }
+
+  function eliminarAPUDesdeModal(id, nombre) {
+    showConfirm('¿Eliminar el APU "' + (nombre || id) + '"?\nSe eliminarán también todos sus ítems.', () => {
+      google.script.run
+        .withSuccessHandler(() => {
+          todosLosAPUs = todosLosAPUs.filter(a => a.id != id);
+          filtrarModalAPUs();
+          showToast("APU eliminado.", "success");
+        })
+        .withFailureHandler(err => showToast("Error eliminando APU: " + err.message, "error"))
+        .eliminarAPU(id);
+    });
   }
 
   function seleccionarAPU(apuId) {
@@ -2058,15 +2154,15 @@
   // ═══ ENVIAR COTIZACIÓN + GUARDAR PDF EN DRIVE ════════════════════════════
   function descargarPDF() {
     if (!cotActual) { showToast("Guarda la cotización primero.", "warning"); return; }
-    btnSetEstado("btn-pdf", "loading", "⏳ Generando PDF...");
+    btnSetEstado("btn-pdf", "loading", "⏳ Generando Excel...");
     google.script.run
       .withSuccessHandler(res => {
         if (!res.ok) {
           btnSetEstado("btn-pdf", "error", "✕ Error al generar");
-          showToast("Error generando PDF: " + res.error, "error");
+          showToast("Error generando Excel: " + res.error, "error");
           return;
         }
-        const blob = b64toBlob(res.base64, "application/pdf");
+        const blob = b64toBlob(res.base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement("a");
         a.href     = url;
@@ -2074,7 +2170,7 @@
         a.click();
         URL.revokeObjectURL(url);
         btnSetEstado("btn-pdf", "success", "✓ Descargado");
-        showAlert("PDF Descargado", "La cotización fue descargada exitosamente.\n" + res.fileName, "success");
+        showAlert("Excel Descargado", "La cotización fue descargada exitosamente.\n" + res.fileName, "success");
       })
       .withFailureHandler(err => {
         btnSetEstado("btn-pdf", "error", "✕ Error");
@@ -2221,6 +2317,106 @@
     okBtn.style.background = color;
     okBtn.onclick = () => { document.getElementById("modal-alert").style.display = "none"; };
     document.getElementById("modal-alert").style.display = "flex";
+  }
+
+  // ═══ MIS ARCHIVOS (Drive) ═════════════════════════════════════════════════
+
+  let archivosData       = [];
+  let archivosVisible    = [];
+  let archivosFiltroTipo = "TODOS";
+
+  function irTabArchivos() {
+    tabActual = "archivos";
+    document.getElementById("tab-archivos").classList.add("active");
+    document.getElementById("tab-apus").classList.remove("active");
+    document.getElementById("tab-cots").classList.remove("active");
+    document.getElementById("btn-nuevo").style.display = "none";
+    document.getElementById("v-apu").style.display  = "none";
+    document.getElementById("v-cot").style.display  = "none";
+    document.getElementById("v-lista").style.display = "";
+    cargarArchivos();
+  }
+
+  function cargarArchivos() {
+    const el = document.getElementById("lista-container");
+    el.innerHTML = '<div class="loading">Cargando archivos de Drive...</div>';
+    google.script.run
+      .withSuccessHandler(data => {
+        archivosData = data || [];
+        renderContenedorArchivos();
+      })
+      .withFailureHandler(err => {
+        el.innerHTML = '<p class="empty" style="color:#c62828">Error al cargar Drive: ' + err.message + '</p>';
+      })
+      .listarArchivosDrive();
+  }
+
+  function renderContenedorArchivos() {
+    const el = document.getElementById("lista-container");
+    archivosFiltroTipo = "TODOS";
+    el.innerHTML = `
+      <div style="padding:10px 14px;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fafafa">
+        <input id="arch-search" type="text" placeholder="Buscar por nombre de archivo o cliente..."
+          oninput="filtrarArchivos()"
+          style="border:1px solid #ddd;border-radius:4px;padding:7px 10px;font-size:12px;flex:1;min-width:180px;outline:none">
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button id="af-todos" onclick="setFiltroArchivos('TODOS')"
+            style="padding:5px 14px;border:1px solid #1a237e;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;background:#1a237e;color:#fff">Todos</button>
+          <button id="af-apu" onclick="setFiltroArchivos('APU')"
+            style="padding:5px 14px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:11px;font-weight:500;background:#fff;color:#555">APUs</button>
+          <button id="af-cot" onclick="setFiltroArchivos('COT')"
+            style="padding:5px 14px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:11px;font-weight:500;background:#fff;color:#555">Cotizaciones</button>
+        </div>
+      </div>
+      <div id="arch-tabla"></div>`;
+    filtrarArchivos();
+  }
+
+  function setFiltroArchivos(tipo) {
+    archivosFiltroTipo = tipo;
+    const mapa = { TODOS: "af-todos", APU: "af-apu", COT: "af-cot" };
+    Object.entries(mapa).forEach(([t, id]) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      const activo = t === tipo;
+      btn.style.background  = activo ? "#1a237e" : "#fff";
+      btn.style.color       = activo ? "#fff"    : "#555";
+      btn.style.borderColor = activo ? "#1a237e" : "#ccc";
+      btn.style.fontWeight  = activo ? "700"     : "500";
+    });
+    filtrarArchivos();
+  }
+
+  function filtrarArchivos() {
+    const q = (document.getElementById("arch-search")?.value || "").toLowerCase().trim();
+    let items = archivosData;
+    if (archivosFiltroTipo !== "TODOS") items = items.filter(f => f.tipo === archivosFiltroTipo);
+    if (q) items = items.filter(f => (f.nombre || "").toLowerCase().includes(q));
+    renderTablaArchivos(items);
+  }
+
+  function renderTablaArchivos(items) {
+    archivosVisible = items;
+    const el = document.getElementById("arch-tabla");
+    if (!el) return;
+    if (!items.length) {
+      el.innerHTML = '<p class="empty">No se encontraron archivos en Drive.</p>';
+      return;
+    }
+    el.innerHTML = `<table class="list-table">
+      <thead><tr>
+        <th style="width:110px">TIPO</th>
+        <th>NOMBRE DEL ARCHIVO</th>
+        <th style="width:100px">FECHA</th>
+        <th style="width:130px"></th>
+      </tr></thead>
+      <tbody>${items.map((f) => `<tr>
+        <td><span class="badge ${f.tipo === 'APU' ? '' : 'badge-ok'}">${f.tipo === 'APU' ? 'APU' : 'COTIZACIÓN'}</span></td>
+        <td style="font-size:12px">${f.nombre}</td>
+        <td style="font-size:11px;color:#777">${f.fecha}</td>
+        <td><a href="${f.url.replace(/&/g,'&amp;')}" target="_blank" class="btn-open" style="display:inline-block;text-decoration:none">Abrir en Drive →</a></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
   }
 
   window.onload = init;

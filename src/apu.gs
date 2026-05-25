@@ -81,10 +81,7 @@ function _generarBlobPDFApu(apuId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
   const blob = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -92,6 +89,41 @@ function _generarBlobPDFApu(apuId) {
 
   ss.deleteSheet(tmp);
   return { blob, apu };
+}
+
+function listarArchivosDrive() {
+  const cfg = getConfig();
+  const resultado = [];
+  const carpetas = [
+    { key: "carpeta_apus",         tipo: "APU" },
+    { key: "carpeta_cotizaciones", tipo: "COT" },
+  ];
+  carpetas.forEach(({ key, tipo }) => {
+    const id = (cfg[key] || "").trim();
+    if (!id) return;
+    try {
+      _recolectarArchivos(DriveApp.getFolderById(id), tipo, resultado);
+    } catch(e) {}
+  });
+  resultado.sort((a, b) => (b.fecha > a.fecha ? 1 : b.fecha < a.fecha ? -1 : 0));
+  return resultado;
+}
+
+function _recolectarArchivos(folder, tipo, resultado) {
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    resultado.push({
+      nombre: f.getName(),
+      url:    f.getUrl(),
+      fecha:  Utilities.formatDate(f.getDateCreated(), Session.getScriptTimeZone(), "dd/MM/yyyy"),
+      tipo,
+    });
+  }
+  const subs = folder.getFolders();
+  while (subs.hasNext()) {
+    _recolectarArchivos(subs.next(), tipo, resultado);
+  }
 }
 
 function exportarAPUaDrive(apuId) {
@@ -109,7 +141,7 @@ function exportarAPUaDrive(apuId) {
       .normalize("NFD").replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
     const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const fileName = codigo + "_" + slug + ".pdf";
+    const fileName = codigo + "_" + slug + ".xlsx";
 
     // Reemplazar archivo anterior con el mismo nombre si existe
     const iter = folder.getFilesByName(fileName);
@@ -133,7 +165,7 @@ function descargarAPUBase64(apuId) {
       .normalize("NFD").replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
     const codigo   = String(apu.codigo_item || "APU").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const fileName = codigo + "_" + slug + ".pdf";
+    const fileName = codigo + "_" + slug + ".xlsx";
 
     return { ok: true, base64: Utilities.base64Encode(blob.getBytes()), fileName };
   } catch(e) {
@@ -143,8 +175,8 @@ function descargarAPUBase64(apuId) {
 
 function _llenarHojaAPU(sheet, apu, ss) {
   const MONEY    = '"$"#,##0';
-  const NEGRO    = "#1a1a1a";
-  const GRIS_OSC = "#424242";
+  const NEGRO    = "#a8a8a8";
+  const GRIS_OSC = "#c8c8c8";
   const GRIS_CLR = "#f5f5f5";
   const BORDE    = "#dddddd";
   const cfg      = getConfig();
@@ -190,15 +222,17 @@ function _llenarHojaAPU(sheet, apu, ss) {
     ["CLIENTE / OBRA", apu.cliente  || "—", "CÓDIGO", apu.codigo_item || "—"],
     ["UNIDAD",         apu.unidad   || "—", "FECHA",  apu.fecha       || "—"],
   ];
-  datosGen.forEach(fila => {
-    sheet.setRowHeight(r, 22);
+  datosGen.forEach((fila, idx) => {
+    const isCliente = idx === 0;
+    sheet.setRowHeight(r, isCliente ? 44 : 22);
     sheet.getRange(r, 1, 1, 2).merge().setValue(fila[0])
       .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
       .setHorizontalAlignment("left").setVerticalAlignment("middle")
       .setBackground("#f5f5f5");
-    sheet.getRange(r, 3, 1, 2).merge().setValue(fila[1])
+    const valorCell = sheet.getRange(r, 3, 1, 2).merge().setValue(fila[1])
       .setFontSize(9).setHorizontalAlignment("left").setVerticalAlignment("middle")
       .setBackground("#ffffff");
+    if (isCliente) valorCell.setWrap(true).setVerticalAlignment("top");
     sheet.getRange(r, 5).setValue(fila[2])
       .setFontSize(8).setFontWeight("bold").setFontColor("#555555")
       .setHorizontalAlignment("left").setVerticalAlignment("middle")
@@ -240,32 +274,54 @@ function _llenarHojaAPU(sheet, apu, ss) {
     sheet.setRowHeight(r, 24);
     sheet.getRange(r, 1, 1, 7).merge()
       .setValue(sec.label)
-      .setBackground(GRIS_OSC).setFontColor("#ffffff")
+      .setBackground(GRIS_OSC).setFontColor("#333333")
       .setFontWeight("bold").setFontSize(9)
       .setHorizontalAlignment("left").setVerticalAlignment("middle");
     r++;
 
     if (items.length > 0) {
       // Cabecera de columnas
+      const showUnidad = sec.key === "materiales";
       sheet.setRowHeight(r, 20);
-      sheet.getRange(r, 1, 1, 7)
-        .setValues([["ÍTEM", "DESCRIPCIÓN", "UNIDAD", "CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"]])
-        .setBackground(GRIS_CLR).setFontColor("#333333")
-        .setFontWeight("bold").setFontSize(8)
-        .setHorizontalAlignment("center").setVerticalAlignment("middle")
-        .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      if (showUnidad) {
+        sheet.getRange(r, 1, 1, 7)
+          .setValues([["ÍTEM", "DESCRIPCIÓN", "UNIDAD", "CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"]])
+          .setBackground(GRIS_CLR).setFontColor("#333333")
+          .setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+      } else {
+        sheet.getRange(r, 1).setValue("ÍTEM")
+          .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, true, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 2, 1, 2).merge().setValue("DESCRIPCIÓN")
+          .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        ["CANT.", "REND.", "P. UNITARIO", "VALOR PARCIAL"].forEach((h, i) => {
+          sheet.getRange(r, 4 + i).setValue(h)
+            .setBackground(GRIS_CLR).setFontColor("#333333").setFontWeight("bold").setFontSize(8)
+            .setHorizontalAlignment("center").setVerticalAlignment("middle")
+            .setBorder(true, null, true, i === 3, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        });
+      }
       r++;
 
       items.forEach((it, idx) => {
-        sheet.setRowHeight(r, 20);
         const rend = (it.rendimiento !== null && it.rendimiento !== "") ? it.rendimiento : "—";
         const bg   = idx % 2 === 0 ? "#ffffff" : "#fafafa";
         sheet.getRange(r, 1).setValue(idx + 1)
           .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
-        sheet.getRange(r, 2).setValue(it.descripcion_manual || "—")
-          .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
-        sheet.getRange(r, 3).setValue(it.unidad || "")
-          .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        if (showUnidad) {
+          sheet.getRange(r, 2).setValue(it.descripcion_manual || "—")
+            .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
+          sheet.getRange(r, 3).setValue(it.unidad || "")
+            .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        } else {
+          sheet.getRange(r, 2, 1, 2).merge().setValue(it.descripcion_manual || "—")
+            .setFontSize(8).setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
+        }
         sheet.getRange(r, 4).setValue(it.cantidad || 0)
           .setFontSize(8).setHorizontalAlignment("right").setVerticalAlignment("middle");
         sheet.getRange(r, 5).setValue(rend)
@@ -313,11 +369,11 @@ function _llenarHojaAPU(sheet, apu, ss) {
   const costoNeto = parseFloat(apu.costo_neto) || 0;
   sheet.getRange(r, 1, 1, 6).merge()
     .setValue("COSTOS DIRECTOS  (A + B + C + D)")
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   sheet.getRange(r, 7).setValue(costoNeto)
-    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setNumberFormat(MONEY).setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   r++;
@@ -326,9 +382,9 @@ function _llenarHojaAPU(sheet, apu, ss) {
   sheet.setRowHeight(r, 18);
   sheet.getRange(r, 1, 1, 7).merge()
     .setValue("COSTOS INDIRECTOS")
-    .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(9).setFontWeight("bold").setFontColor("#333333")
     .setHorizontalAlignment("left").setVerticalAlignment("middle")
-    .setBackground("#37474f");
+    .setBackground("#c8c8c8");
   r++;
 
   // Filas de indirectos
@@ -368,11 +424,11 @@ function _llenarHojaAPU(sheet, apu, ss) {
   sheet.setRowHeight(r, 30);
   sheet.getRange(r, 1, 1, 6).merge()
     .setValue("VALOR UNITARIO TOTAL")
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
   sheet.getRange(r, 7).setValue(valorTotal)
-    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setNumberFormat(MONEY).setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle")
     .setBackground(NEGRO);
 }
@@ -400,18 +456,111 @@ function eliminarAPU(apuId) {
 // ─── LISTA DE APUs ────────────────────────────────────────────────────────────
 
 function listarAPUs() {
-  const items = sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "APU");
-  return items.map(a => ({
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("APU");
+
+  // Si la hoja APU está vacía pero hay datos en otras tablas, reconstruir automáticamente
+  if (!sheet || sheet.getLastRow() < 2) {
+    reconstruirAPUsDesdeItems();
+  }
+
+  return sheetToObjects(ss, "APU").map(a => ({
     id:          a.id,
     codigo_item: a.codigo_item,
     descripcion: a.descripcion,
     unidad:      a.unidad,
     cliente:     a.cliente,
-    direccion:   a.direccion   || "",
+    direccion:   a.direccion || "",
     actividad:   a.actividad,
     costo_neto:  a.costo_neto,
     fecha:       String(a.fecha || ""),
   }));
+}
+
+// ─── RECONSTRUIR APUs DESDE DATOS EXISTENTES ──────────────────────────────────
+// Recupera APUs usando Cotizacion_Items (descripcion, cliente, costo) + APU_Items (subtotales)
+
+function reconstruirAPUsDesdeItems() {
+  const ss       = SpreadsheetApp.getActiveSpreadsheet();
+  const apuSheet = ss.getSheetByName("APU");
+
+  if (!apuSheet) return { ok: false, error: "Hoja 'APU' no encontrada." };
+  if (apuSheet.getLastRow() >= 2) return { ok: false, error: "La hoja APU ya tiene datos." };
+
+  // Recolectar IDs desde APU_Items y Cotizacion_Items
+  const apuItemsAll = sheetToObjects(ss, "APU_Items");
+  const cotItemsAll = sheetToObjects(ss, "Cotizacion_Items");
+
+  const apuIds = new Set();
+  apuItemsAll.forEach(i => { if (i.apu_id) apuIds.add(String(i.apu_id)); });
+  cotItemsAll.forEach(i => { if (i.apu_id) apuIds.add(String(i.apu_id)); });
+
+  if (!apuIds.size) return { ok: false, error: "No se encontraron APUs en APU_Items ni en Cotizacion_Items. No hay datos para recuperar." };
+
+  // Lookup de cotizaciones para obtener el cliente
+  const cotizaciones = sheetToObjects(ss, "Cotizaciones");
+  const cotById = {};
+  cotizaciones.forEach(c => { cotById[String(c.id)] = c; });
+
+  // Mejor info de cada APU desde Cotizacion_Items (descripcion, unidad, cliente, precio)
+  const infoByApu = {};
+  cotItemsAll.forEach(ci => {
+    const aid = String(ci.apu_id);
+    if (!infoByApu[aid]) {
+      const cot = cotById[String(ci.cotizacion_id)] || {};
+      infoByApu[aid] = {
+        descripcion: ci.descripcion || "",
+        unidad:      ci.unidad      || "",
+        precio_apu:  parseFloat(ci.precio_apu) || 0,
+        cliente:     cot.cliente    || "",
+      };
+    }
+  });
+
+  // Subtotales desde APU_Items
+  const subsByApu = {};
+  apuItemsAll.forEach(item => {
+    const aid = String(item.apu_id);
+    if (!subsByApu[aid]) subsByApu[aid] = { EQUIPO: 0, MATERIAL: 0, MANO_OBRA: 0, OTRO: 0 };
+    subsByApu[aid][item.tipo] = (subsByApu[aid][item.tipo] || 0) + (parseFloat(item.valor_parcial) || 0);
+  });
+
+  const apuHeaders = apuSheet.getRange(1, 1, 1, apuSheet.getLastColumn()).getValues()[0];
+  const fecha      = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+
+  [...apuIds].sort((a, b) => Number(a) - Number(b)).forEach(apuId => {
+    const info   = infoByApu[apuId] || {};
+    const subs   = subsByApu[apuId] || {};
+    const subEq  = subs.EQUIPO    || 0;
+    const subMat = subs.MATERIAL  || 0;
+    const subMo  = subs.MANO_OBRA || 0;
+    const subOt  = subs.OTRO      || 0;
+    const neto   = info.precio_apu || (subEq + subMat + subMo + subOt);
+
+    const valores = {
+      id:                  Number(apuId),
+      codigo_item:         info.descripcion || ("APU-" + apuId),
+      descripcion:         info.descripcion || ("APU-" + apuId),
+      unidad:              info.unidad      || "",
+      cliente:             info.cliente     || "",
+      direccion:           "",
+      actividad:           info.descripcion || "",
+      subtotal_equipos:    subEq,
+      subtotal_materiales: subMat,
+      subtotal_mano_obra:  subMo,
+      subtotal_otros:      subOt,
+      costo_neto:          neto,
+      administracion_pct:  0,
+      imprevistos_pct:     0,
+      utilidad_pct:        0,
+      iva_pct:             19,
+      valor_total:         neto,
+      fecha:               fecha,
+    };
+    apuSheet.appendRow(apuHeaders.map(h => (valores[h] !== undefined ? valores[h] : "")));
+  });
+
+  return { ok: true, count: apuIds.size };
 }
 
 // ─── CREAR APU ────────────────────────────────────────────────────────────────
@@ -528,6 +677,19 @@ function getAPUCompleto(apuId) {
       });
       return o;
     });
+
+  // Enrich items with unidad from BD (APU_Items doesn't store it)
+  const matUnidad  = {};
+  sheetToObjects(ss, "Materiales").forEach(m => { matUnidad[String(m.id)] = m.unidad || ""; });
+  const otroUnidad = {};
+  sheetToObjects(ss, "Otros").forEach(o => { otroUnidad[String(o.id)] = o.unidad || ""; });
+  items.forEach(item => {
+    if (!item.unidad) {
+      if      (item.tipo === "MATERIAL")                              item.unidad = matUnidad[String(item.recurso_id)] || "";
+      else if (item.tipo === "EQUIPO" || item.tipo === "MANO_OBRA")  item.unidad = "Día";
+      else if (item.tipo === "OTRO")                                  item.unidad = otroUnidad[String(item.recurso_id)] || "";
+    }
+  });
 
   apu.equipos    = items.filter(i => i.tipo === "EQUIPO");
   apu.materiales = items.filter(i => i.tipo === "MATERIAL");

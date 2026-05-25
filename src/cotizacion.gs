@@ -48,12 +48,9 @@ function descargarPDFBase64(cotId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
-  const pdfBytes = UrlFetchApp.fetch(url, {
+  const xlsxBytes = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
   }).getContent();
 
@@ -62,9 +59,9 @@ function descargarPDFBase64(cotId) {
   const slug = (cot.cliente || "cotizacion")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
-  const fileName = (cot.numero_oferta || "OF") + "_" + slug + ".pdf";
+  const fileName = (cot.numero_oferta || "OF") + "_" + slug + ".xlsx";
 
-  return { ok: true, base64: Utilities.base64Encode(pdfBytes), fileName };
+  return { ok: true, base64: Utilities.base64Encode(xlsxBytes), fileName };
 }
 
 // ─── EXPORTAR PDF ────────────────────────────────────────────────────────────
@@ -83,10 +80,7 @@ function exportarCotizacionPDF(cotId) {
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
-    + "/export?format=pdf&gid=" + tmp.getSheetId()
-    + "&portrait=true&fitw=true&size=letter"
-    + "&gridlines=false&printtitle=false&sheetnames=false"
-    + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+    + "/export?format=xlsx&gid=" + tmp.getSheetId();
 
   const response = UrlFetchApp.fetch(url, {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -102,7 +96,7 @@ function exportarCotizacionPDF(cotId) {
   const slug   = (cot.cliente || "sin_cliente")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9 ]/g, "").trim().replace(/\s+/g, "_");
-  const fileName = `${dia}-${mes}-${anio}_${hora}-${min}_${slug}.pdf`;
+  const fileName = `${dia}-${mes}-${anio}_${hora}-${min}_${slug}.xlsx`;
 
   const folder = obtenerCarpetaPDF();
   const file   = folder.createFile(response.getBlob().setName(fileName));
@@ -148,8 +142,8 @@ function llenarHojaCotizacion(sheet, cot) {
   const noIncluye     = String(cot.no_incluye     || "").trim();
 
   const MONEY    = '"$"#,##0';
-  const NEGRO    = "#1a1a1a";
-  const GRIS_OSC = "#424242";
+  const NEGRO    = "#a8a8a8";
+  const GRIS_OSC = "#c8c8c8";
   const GRIS_MED = "#9e9e9e";
   const GRIS_CLR = "#f5f5f5";
   const BORDE    = "#dddddd";
@@ -165,7 +159,7 @@ function llenarHojaCotizacion(sheet, cot) {
   let r = 1;
 
   // ─── LOGO + ENCABEZADO ────────────────────────────────────────────────────────
-  sheet.setRowHeight(r, 85);
+  sheet.setRowHeight(r, 55);
   sheet.getRange(r, 1, 1, 2).merge().setValue("").setBackground("#ffffff");
   sheet.getRange(r, 3, 1, 4).merge()
     .setValue(empresa || "").setFontSize(16).setFontWeight("bold").setFontColor("#000000")
@@ -173,7 +167,7 @@ function llenarHojaCotizacion(sheet, cot) {
   if (logoId) {
     try {
       const img = sheet.insertImage(DriveApp.getFileById(logoId).getBlob(), 1, r);
-      img.setWidth(215).setHeight(78);
+      img.setWidth(160).setHeight(48);
     } catch(e) {}
   }
   r++;
@@ -181,7 +175,7 @@ function llenarHojaCotizacion(sheet, cot) {
   // Fila cliente + dirección (con wrap para que no se corte)
   const clienteTexto   = cot.cliente   ? "CLIENTE:    " + cot.cliente   : "";
   const direccionTexto = cot.direccion ? "DIRECCIÓN:  " + cot.direccion : "";
-  sheet.setRowHeight(r, 34);
+  sheet.setRowHeight(r, 22);
   sheet.getRange(r, 1, 1, 3).merge()
     .setValue(clienteTexto)
     .setFontSize(9).setFontColor("#222222").setFontWeight("bold")
@@ -195,7 +189,7 @@ function llenarHojaCotizacion(sheet, cot) {
   r++;
 
   // Datos de oferta (N° oferta, fecha)
-  sheet.setRowHeight(r, 20);
+  sheet.setRowHeight(r, 14);
   const infoOferta = [
     cot.numero_oferta ? "N° Oferta: " + cot.numero_oferta : null,
     cot.fecha         ? "Fecha: "     + cot.fecha         : null,
@@ -213,10 +207,10 @@ function llenarHojaCotizacion(sheet, cot) {
   r++;
 
   // ─── ENCABEZADO DE TABLA ──────────────────────────────────────────────────────
-  sheet.setRowHeight(r, 26);
+  sheet.setRowHeight(r, 20);
   sheet.getRange(r, 1, 1, NC)
     .setValues([["ÍTEM", "DESCRIPCIÓN", "UND", "CANT.", "VR. UNITARIO", "VR. TOTAL"]])
-    .setBackground(NEGRO).setFontColor("#ffffff").setFontWeight("bold").setFontSize(9)
+    .setBackground(NEGRO).setFontColor("#1a1a1a").setFontWeight("bold").setFontSize(8)
     .setHorizontalAlignment("center").setVerticalAlignment("middle")
     .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   r++;
@@ -243,24 +237,24 @@ function llenarHojaCotizacion(sheet, cot) {
     const total  = cant * precio;
 
     // Fila principal del APU
-    sheet.setRowHeight(r, 24);
+    sheet.setRowHeight(r, 18);
     sheet.getRange(r, 1, 1, NC)
       .setBackground(GRIS_OSC)
       .setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(r, 1).setValue(idx + 1)
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("center").setVerticalAlignment("middle");
     sheet.getRange(r, 2).setValue((item.codigo_item ? "[" + item.codigo_item + "]  " : "") + (item.descripcion || ""))
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("left").setVerticalAlignment("middle").setWrap(true);
     sheet.getRange(r, 3).setValue(item.unidad || "")
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("center").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("center").setVerticalAlignment("middle");
     sheet.getRange(r, 4).setValue(cant)
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("right").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("right").setVerticalAlignment("middle");
     sheet.getRange(r, 5).setValue(precio).setNumberFormat(MONEY)
-      .setFontSize(9).setFontColor("#ffffff").setHorizontalAlignment("right").setVerticalAlignment("middle");
+      .setFontSize(9).setFontColor("#1a1a1a").setHorizontalAlignment("right").setVerticalAlignment("middle");
     sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
-      .setFontSize(9).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
       .setHorizontalAlignment("right").setVerticalAlignment("middle");
     r++;
 
@@ -270,7 +264,7 @@ function llenarHojaCotizacion(sheet, cot) {
       if (!subitems.length) return;
 
       // Encabezado de sección
-      sheet.setRowHeight(r, 17);
+      sheet.setRowHeight(r, 12);
       sheet.getRange(r, 1, 1, NC).merge()
         .setValue("  " + sec.label)
         .setBackground(GRIS_CLR).setFontColor("#333333")
@@ -281,20 +275,26 @@ function llenarHojaCotizacion(sheet, cot) {
 
       // Ítems de la sección
       subitems.forEach((it, i) => {
-        sheet.setRowHeight(r, 17);
         const bg = i % 2 === 0 ? "#ffffff" : "#fafafa";
-        const rend = (it.rendimiento !== null && it.rendimiento !== undefined && it.rendimiento !== "") ? it.rendimiento : "";
-        const cantTexto = (it.cantidad != null ? String(it.cantidad) : "") + (rend ? "  /  " + rend : "");
+        const cantTexto = it.cantidad != null ? it.cantidad : "";
+        const mostrarUnidad = sec.key === "materiales";
         sheet.getRange(r, 1).setValue("").setBackground(bg)
           .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
-        sheet.getRange(r, 2).setValue("      " + (it.descripcion_manual || "—"))
-          .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
-          .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
-          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
-        sheet.getRange(r, 3).setValue(it.unidad || "")
-          .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("center")
-          .setVerticalAlignment("middle").setBackground(bg)
-          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        if (mostrarUnidad) {
+          sheet.getRange(r, 2).setValue("      " + (it.descripcion_manual || "—"))
+            .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
+            .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+          sheet.getRange(r, 3).setValue(it.unidad || "")
+            .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("center")
+            .setVerticalAlignment("middle").setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        } else {
+          sheet.getRange(r, 2, 1, 2).merge().setValue("      " + (it.descripcion_manual || "—"))
+            .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
+            .setVerticalAlignment("middle").setWrap(true).setBackground(bg)
+            .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        }
         sheet.getRange(r, 4).setValue(cantTexto)
           .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("right")
           .setVerticalAlignment("middle").setBackground(bg)
@@ -307,12 +307,29 @@ function llenarHojaCotizacion(sheet, cot) {
           .setFontSize(8).setFontWeight("bold").setFontColor("#111111").setHorizontalAlignment("right")
           .setVerticalAlignment("middle").setBackground(bg)
           .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.setRowHeight(r, 13);
         r++;
       });
+
+      // Subtotal de sección
+      const secSubtotal = subitems.reduce((s, it) => s + (parseFloat(it.valor_parcial) || 0), 0);
+      sheet.setRowHeight(r, 15);
+      sheet.getRange(r, 1, 1, 5).merge()
+        .setValue("Subtotal " + sec.label)
+        .setFontSize(8).setFontWeight("bold").setFontColor("#333333")
+        .setHorizontalAlignment("right").setVerticalAlignment("middle")
+        .setBackground(GRIS_CLR)
+        .setBorder(true, true, true, null, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+      sheet.getRange(r, 6).setValue(secSubtotal).setNumberFormat(MONEY)
+        .setFontSize(8).setFontWeight("bold").setFontColor("#111111")
+        .setHorizontalAlignment("right").setVerticalAlignment("middle")
+        .setBackground(GRIS_CLR)
+        .setBorder(true, null, true, true, null, null, "#888888", SpreadsheetApp.BorderStyle.SOLID);
+      r++;
     });
 
     // Fila de subtotal del APU
-    sheet.setRowHeight(r, 20);
+    sheet.setRowHeight(r, 15);
     sheet.getRange(r, 1, 1, 5).merge()
       .setValue("SUBTOTAL ÍT. " + (idx + 1))
       .setFontSize(8).setFontWeight("bold").setFontColor("#333333")
@@ -328,14 +345,14 @@ function llenarHojaCotizacion(sheet, cot) {
   });
 
   // ─── TOTAL COSTOS DIRECTOS ────────────────────────────────────────────────────
-  sheet.setRowHeight(r, 24);
+  sheet.setRowHeight(r, 18);
   sheet.getRange(r, 1, 1, 5).merge()
     .setValue("TOTAL COSTOS DIRECTOS")
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(9).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(GRIS_OSC)
     .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   sheet.getRange(r, 6).setValue(valorNeto).setNumberFormat(MONEY)
-    .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(GRIS_OSC)
     .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   r++;
@@ -356,7 +373,7 @@ function llenarHojaCotizacion(sheet, cot) {
   ].filter(Boolean);
 
   aiuFilas.forEach(([label, val]) => {
-    sheet.setRowHeight(r, 20);
+    sheet.setRowHeight(r, 15);
     sheet.getRange(r, 1, 1, 5).merge()
       .setValue(label).setFontSize(9).setFontColor("#333333")
       .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground("#ffffff")
@@ -369,25 +386,25 @@ function llenarHojaCotizacion(sheet, cot) {
   });
 
   // Valor total oferta
-  sheet.setRowHeight(r, 28);
+  sheet.setRowHeight(r, 20);
   sheet.getRange(r, 1, 1, 5).merge()
     .setValue("VALOR TOTAL OFERTA")
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
     .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
-    .setFontSize(12).setFontWeight("bold").setFontColor("#ffffff")
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
     .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
     .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   r++;
 
   // ─── CONDICIONES COMERCIALES ──────────────────────────────────────────────────
   if (formaPago || plazoEntrega || validezOferta || noIncluye) {
-    r += 2;
-    sheet.setRowHeight(r, 22);
+    r += 1;
+    sheet.setRowHeight(r, 18);
     sheet.getRange(r, 1, 1, NC).merge()
       .setValue("CONDICIONES COMERCIALES")
-      .setFontSize(10).setFontWeight("bold").setFontColor("#ffffff")
+      .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
       .setBackground(GRIS_OSC)
       .setHorizontalAlignment("left").setVerticalAlignment("middle");
     r++;
@@ -423,7 +440,7 @@ function llenarHojaCotizacion(sheet, cot) {
   }
 
   // ─── FIRMA ────────────────────────────────────────────────────────────────────
-  r += 2;
+  r += 1;
   const firmaId = (cfg["firma_id"] || "").trim();
   if (firmaId) {
     try {
@@ -534,6 +551,21 @@ function getCotizacionCompleta(cotId) {
       aih.forEach((h, i) => o[h] = r[i]);
       return o;
     });
+
+    // Build unidad lookup from BD (APU_Items doesn't store unidad)
+    const matUnidad  = {};
+    sheetToObjects(ss, "Materiales").forEach(m => { matUnidad[String(m.id)] = m.unidad || ""; });
+    const otroUnidad = {};
+    sheetToObjects(ss, "Otros").forEach(o => { otroUnidad[String(o.id)] = o.unidad || ""; });
+
+    allApuItems.forEach(ai => {
+      if (!ai.unidad) {
+        if      (ai.tipo === "MATERIAL")                         ai.unidad = matUnidad[String(ai.recurso_id)] || "";
+        else if (ai.tipo === "EQUIPO" || ai.tipo === "MANO_OBRA") ai.unidad = "Día";
+        else if (ai.tipo === "OTRO")                             ai.unidad = otroUnidad[String(ai.recurso_id)] || "";
+      }
+    });
+
     cot.items.forEach(item => {
       const subs      = allApuItems.filter(ai => String(ai.apu_id) === String(item.apu_id));
       item.equipos    = subs.filter(i => i.tipo === "EQUIPO");
@@ -694,9 +726,9 @@ function enviarCotizacionEmail(cotId, emailDestino) {
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
       + "/export?format=pdf&gid=" + tmp.getSheetId()
-      + "&portrait=true&fitw=true&size=letter"
+      + "&portrait=true&scale=4&size=letter"
       + "&gridlines=false&printtitle=false&sheetnames=false"
-      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+      + "&top_margin=0.50&bottom_margin=0.50&left_margin=0.50&right_margin=0.50";
 
     const blob = UrlFetchApp.fetch(exportUrl, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
@@ -771,9 +803,9 @@ function enviarYGuardarPDF(cotId, emailDestino) {
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
       + "/export?format=pdf&gid=" + tmp.getSheetId()
-      + "&portrait=true&fitw=true&size=letter"
+      + "&portrait=true&scale=4&size=letter"
       + "&gridlines=false&printtitle=false&sheetnames=false"
-      + "&top_margin=0.75&bottom_margin=0.75&left_margin=0.75&right_margin=0.75";
+      + "&top_margin=0.50&bottom_margin=0.50&left_margin=0.50&right_margin=0.50";
 
     const pdfBlob = UrlFetchApp.fetch(exportUrl, {
       headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }

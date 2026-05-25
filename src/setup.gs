@@ -106,6 +106,30 @@ function migrarColumnaIVA() {
   SpreadsheetApp.getUi().alert("✅ Columna iva_pct agregada con 19% por defecto en todas las cotizaciones existentes.");
 }
 
+function limpiarDatos() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.alert(
+    "⚠️ Limpiar datos",
+    "Esto borrará TODOS los APUs y cotizaciones guardados.\n\n" +
+    "La BD de precios y la configuración NO se tocarán.\n\n" +
+    "¿Continuar?",
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const hojas  = ["APU", "APU_Items", "Cotizaciones", "Cotizacion_Items"];
+
+  hojas.forEach(nombre => {
+    const sheet = ss.getSheetByName(nombre);
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
+  });
+
+  ui.alert("✅ Datos limpiados. Las hojas APU, APU_Items, Cotizaciones y Cotizacion_Items están vacías.");
+}
+
 function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
