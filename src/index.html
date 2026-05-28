@@ -332,6 +332,291 @@
     .loading { text-align: center; padding: 40px; color: #888; }
     .mono { font-family: monospace; font-size: 11px; }
 
+    /* ═══ MODAL BD DE PRECIOS ═══════════════════════════════════════════════ */
+    .bd-modal-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 1040px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 18px 50px rgba(0,0,0,.28);
+      overflow: hidden;
+    }
+    .bd-header {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: #fff;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .bd-header-title { display: flex; flex-direction: column; gap: 3px; }
+    .bd-header-title h3 { font-size: 16px; font-weight: 700; letter-spacing: .3px; margin: 0; color: #fff; }
+    .bd-header-title small { font-size: 11px; color: rgba(255,255,255,.7); letter-spacing: .4px; }
+    .bd-btn-close {
+      background: rgba(255,255,255,.12);
+      border: none;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      transition: background .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bd-btn-close:hover { background: rgba(255,255,255,.25); }
+
+    .bd-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 12px 24px 0;
+      background: #f7f8fc;
+      border-bottom: 1px solid #e0e3ed;
+    }
+    .bd-tab {
+      padding: 9px 22px;
+      border: 1px solid #d3d8e8;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5c6bc0;
+      background: #fff;
+      transition: all .15s;
+      letter-spacing: .2px;
+    }
+    .bd-tab:hover { color: #1a237e; background: #eef1fa; }
+    .bd-tab.active {
+      background: #1a237e;
+      color: #fff;
+      border-color: #1a237e;
+      box-shadow: 0 -2px 8px rgba(26,35,126,.18);
+    }
+    .bd-tab.active:hover { background: #1a237e; color: #fff; }
+
+    .bd-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 24px;
+      gap: 16px;
+      background: #fafbfd;
+      border-bottom: 1px solid #eef0f5;
+    }
+    .bd-search-wrap {
+      position: relative;
+      flex: 1;
+      max-width: 320px;
+    }
+    .bd-search-wrap::before {
+      content: "🔍";
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      opacity: .5;
+      pointer-events: none;
+    }
+    .bd-search {
+      border: 1px solid #d8dce8;
+      border-radius: 8px;
+      padding: 9px 12px 9px 32px;
+      font-size: 12px;
+      width: 100%;
+      outline: none;
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .bd-search:focus {
+      border-color: #1a237e;
+      box-shadow: 0 0 0 3px rgba(26,35,126,.1);
+    }
+    .bd-count {
+      font-size: 11px;
+      color: #6b7390;
+      background: #eef1fa;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .bd-toolbar-actions { display: flex; gap: 10px; align-items: center; }
+    .bd-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 9px 18px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .12s, box-shadow .15s, background .15s;
+      letter-spacing: .2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bd-btn:active { transform: translateY(1px); }
+    .bd-btn-primary {
+      background: #1a237e;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(26,35,126,.25);
+    }
+    .bd-btn-primary:hover { background: #283593; box-shadow: 0 3px 10px rgba(26,35,126,.35); }
+    .bd-btn-outline {
+      background: #fff;
+      color: #1a237e;
+      border: 1px solid #c5cae9;
+    }
+    .bd-btn-outline:hover { background: #eef1fa; border-color: #1a237e; }
+
+    .bd-results {
+      flex: 1;
+      overflow-y: auto;
+      background: #fff;
+    }
+    .bd-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .bd-table thead th {
+      background: #f5f6fa;
+      color: #5c6276;
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid #e0e3ed;
+      z-index: 1;
+    }
+    .bd-table tbody tr {
+      transition: background .12s;
+      border-bottom: 1px solid #f0f2f7;
+    }
+    .bd-table tbody tr:nth-child(even) { background: #fafbfd; }
+    .bd-table tbody tr:hover { background: #eef1fa; }
+    .bd-table td { padding: 10px 14px; vertical-align: middle; color: #2d3142; }
+    .bd-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+    .bd-table td.center { text-align: center; }
+
+    .bd-row-action {
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .bd-row-edit { color: #1a237e; }
+    .bd-row-edit:hover { background: #1a237e; color: #fff; border-color: #1a237e; }
+    .bd-row-del { color: #c62828; }
+    .bd-row-del:hover { background: #fde9e9; border-color: #ef9a9a; }
+
+    .bd-empty {
+      text-align: center;
+      padding: 56px 20px;
+      color: #8b91a8;
+    }
+    .bd-empty-icon { font-size: 36px; opacity: .35; margin-bottom: 8px; }
+    .bd-empty-text { font-size: 13px; }
+
+    .bd-loading {
+      text-align: center;
+      padding: 56px 20px;
+      color: #6b7390;
+      font-size: 12px;
+    }
+    .bd-loading::after {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      animation: bdDots 1.2s steps(4, end) infinite;
+    }
+    @keyframes bdDots {
+      0%   { content: ""; }
+      25%  { content: "."; }
+      50%  { content: ".."; }
+      75%  { content: "..."; }
+      100% { content: ""; }
+    }
+
+    /* Form modal — edición de registro */
+    .bd-edit-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 760px;
+      box-shadow: 0 18px 50px rgba(0,0,0,.32);
+      overflow: hidden;
+    }
+    .bd-edit-header {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: #fff;
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .bd-edit-title { font-size: 14px; font-weight: 700; letter-spacing: .4px; }
+    .bd-edit-body { padding: 22px 24px; }
+    .bd-edit-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+      align-items: center;
+      padding-top: 18px;
+      border-top: 1px solid #eef0f5;
+    }
+    .bd-edit-estado { font-size: 11px; color: #6b7390; flex: 1; }
+    .bd-edit-input {
+      width: 100%;
+      border: 1px solid #d8dce8;
+      border-radius: 7px;
+      padding: 9px 11px;
+      font-size: 12px;
+      outline: none;
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      box-sizing: border-box;
+    }
+    .bd-edit-input:focus {
+      border-color: #1a237e;
+      box-shadow: 0 0 0 3px rgba(26,35,126,.1);
+    }
+    .bd-edit-label {
+      font-size: 10px;
+      color: #6b7390;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    @media (max-width: 768px) {
+      .bd-modal-box { max-width: 100%; border-radius: 12px 12px 0 0; max-height: 95vh; }
+      .bd-toolbar { flex-wrap: wrap; }
+      .bd-search-wrap { max-width: 100%; }
+      .bd-count { order: -1; }
+      .bd-table thead th { padding: 10px 12px; font-size: 11px; }
+      .bd-table td { padding: 12px 12px; font-size: 13px; }
+      .bd-row-action { padding: 8px 12px; font-size: 12px; min-height: 36px; }
+      .bd-tab { padding: 10px 16px; font-size: 13px; }
+      .bd-btn { padding: 10px 16px; font-size: 13px; min-height: 40px; }
+    }
+
     /* ── TABS ── */
     .tab-group { display: flex; gap: 2px; }
     .tab-btn { background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 12px; font-weight: 500; }
@@ -625,6 +910,29 @@
     <!-- TOTALES -->
     <div class="card sec-totales">
       <div class="sec-header"><span>RESUMEN</span></div>
+
+      <div style="padding:5px 14px;background:#607d8b;color:#fff;font-size:10px;font-weight:700;letter-spacing:.6px">
+        AJUSTES DEL APU
+      </div>
+      <div class="totales-body">
+        <div class="total-row" style="align-items:center">
+          <span class="label">Desperdicio Materiales</span>
+          <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <input id="apu-desperdicio-pct" type="number" min="0" max="100" step="0.1" value="0"
+                   class="pct-input" oninput="recalcularTotalesUI()" onblur="guardarCabeza()">
+            <span style="font-size:11px;color:#777">%</span>
+          </span>
+        </div>
+        <div class="total-row" style="align-items:center">
+          <span class="label">Herramienta Menor</span>
+          <span style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <input id="apu-hm-pct" type="number" min="0" max="100" step="0.1" value="0"
+                   class="pct-input" oninput="recalcularTotalesUI()" onblur="guardarCabeza()">
+            <span style="font-size:11px;color:#777">% MO</span>
+          </span>
+        </div>
+      </div>
+
       <div class="totales-body">
         <div class="total-row" style="background:#f0f2f5">
           <span class="label" style="font-weight:600;font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.3px">Costos Directos &nbsp;<small style="color:#999">(A + B + C + D)</small></span>
@@ -839,42 +1147,42 @@
      MODAL: GESTIÓN BD DE PRECIOS
 ════════════════════════════════════════════════ -->
 <div id="modal-bd" onclick="cerrarModalBD(event)"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:20px">
-  <div class="modal-box" style="max-width:980px;width:100%">
-    <div class="modal-header">
-      <h3>Base de Datos de Precios</h3>
-      <button class="btn-close" onclick="cerrarModalBD()">✕</button>
+     style="display:none;position:fixed;inset:0;background:rgba(15,20,40,.55);backdrop-filter:blur(2px);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div class="bd-modal-box">
+    <div class="bd-header">
+      <div class="bd-header-title">
+        <h3>Base de Datos de Precios</h3>
+        <small>Materiales · Mano de obra · Equipos</small>
+      </div>
+      <button class="bd-btn-close" onclick="cerrarModalBD()" title="Cerrar">✕</button>
     </div>
 
     <!-- Tabs -->
-    <div style="display:flex;gap:4px;padding:10px 18px 0;background:#f5f5f5;border-bottom:1px solid #ddd">
-      <button id="bd-tab-MAT" onclick="bdCambiarTab('MAT')"
-        style="padding:6px 18px;border:1px solid #1a237e;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:700;background:#1a237e;color:#fff">
-        Materiales
-      </button>
-      <button id="bd-tab-MO" onclick="bdCambiarTab('MO')"
-        style="padding:6px 18px;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:500;background:#fff;color:#555">
-        Mano de Obra
-      </button>
-      <button id="bd-tab-EQ" onclick="bdCambiarTab('EQ')"
-        style="padding:6px 18px;border:1px solid #ccc;border-bottom:none;border-radius:4px 4px 0 0;cursor:pointer;font-size:12px;font-weight:500;background:#fff;color:#555">
-        Equipos
-      </button>
+    <div class="bd-tabs">
+      <button id="bd-tab-MAT" class="bd-tab active" onclick="bdCambiarTab('MAT')">Materiales</button>
+      <button id="bd-tab-MO"  class="bd-tab"        onclick="bdCambiarTab('MO')">Mano de Obra</button>
+      <button id="bd-tab-EQ"  class="bd-tab"        onclick="bdCambiarTab('EQ')">Equipos</button>
     </div>
 
-    <!-- (formulario movido a #modal-bd-edit) -->
-
-    <!-- Barra de búsqueda + botón agregar -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-bottom:1px solid #eee">
-      <input id="bd-search" type="text" placeholder="Buscar..." oninput="filtrarBD()"
-             style="border:1px solid #ddd;border-radius:4px;padding:7px 10px;font-size:12px;width:260px;outline:none">
-      <span id="bd-count" style="font-size:11px;color:#999"></span>
-      <button onclick="mostrarFormBD(null)" style="background:#1a237e;color:#fff;border:none;border-radius:4px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">+ Agregar</button>
+    <!-- Barra de búsqueda + acciones -->
+    <div class="bd-toolbar">
+      <div class="bd-search-wrap">
+        <input id="bd-search" type="text" class="bd-search" placeholder="Buscar..." oninput="filtrarBD()">
+      </div>
+      <span id="bd-count" class="bd-count"></span>
+      <div class="bd-toolbar-actions">
+        <button id="bd-btn-prest-masivo" class="bd-btn bd-btn-outline"
+                style="display:none" onclick="aplicarPrestacionesMasivo()"
+                title="Aplicar el mismo % de prestaciones a todos los roles">
+          ⚖ Aplicar % a todos
+        </button>
+        <button class="bd-btn bd-btn-primary" onclick="mostrarFormBD(null)">+ Agregar</button>
+      </div>
     </div>
 
     <!-- Tabla de resultados -->
-    <div class="modal-results" style="max-height:420px;overflow-y:auto">
-      <table class="modal-table" style="width:100%;border-collapse:collapse">
+    <div class="bd-results">
+      <table class="bd-table">
         <thead id="bd-thead"></thead>
         <tbody id="bd-tbody"></tbody>
       </table>
@@ -967,20 +1275,18 @@
 
 <!-- MODAL: EDITAR / NUEVO REGISTRO BD -->
 <div id="modal-bd-edit"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:8px;width:100%;max-width:720px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">
-    <div style="background:#1a237e;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
-      <span id="bd-form-titulo" style="font-size:14px;font-weight:700;letter-spacing:.3px">NUEVO REGISTRO</span>
-      <button onclick="cancelarFormBD()" style="background:none;border:none;color:rgba(255,255,255,.8);font-size:20px;cursor:pointer;line-height:1">✕</button>
+     style="display:none;position:fixed;inset:0;background:rgba(15,20,40,.6);backdrop-filter:blur(2px);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div class="bd-edit-box">
+    <div class="bd-edit-header">
+      <span id="bd-form-titulo" class="bd-edit-title">NUEVO REGISTRO</span>
+      <button class="bd-btn-close" onclick="cancelarFormBD()" title="Cerrar">✕</button>
     </div>
-    <div style="padding:20px 22px">
-      <div id="bd-form-fields" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"></div>
-      <div style="display:flex;gap:8px;margin-top:18px;align-items:center">
-        <span id="bd-form-estado" style="font-size:11px;color:#555;flex:1"></span>
-        <button class="btn" onclick="cancelarFormBD()"
-                style="background:#eceff1;color:#37474f;font-size:12px;padding:8px 18px">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarRecursoBD()"
-                style="background:#1a237e;color:#fff;font-size:12px;padding:8px 20px;font-weight:600">Guardar</button>
+    <div class="bd-edit-body">
+      <div id="bd-form-fields"></div>
+      <div class="bd-edit-actions">
+        <span id="bd-form-estado" class="bd-edit-estado"></span>
+        <button class="bd-btn bd-btn-outline" onclick="cancelarFormBD()">Cancelar</button>
+        <button class="bd-btn bd-btn-primary" onclick="guardarRecursoBD()">Guardar</button>
       </div>
     </div>
   </div>
@@ -1102,9 +1408,11 @@
     document.getElementById("f-actividad").value = apu.actividad   || "";
     document.getElementById("f-item").value      = apu.codigo_item || "";
     document.getElementById("f-unidad").value    = apu.unidad      || "";
-    document.getElementById("apu-adm-pct").value  = parseFloat(apu.administracion_pct) || 0;
-    document.getElementById("apu-imp-pct").value  = parseFloat(apu.imprevistos_pct)    || 0;
-    document.getElementById("apu-util-pct").value = parseFloat(apu.utilidad_pct)       || 0;
+    document.getElementById("apu-adm-pct").value          = parseFloat(apu.administracion_pct)    || 0;
+    document.getElementById("apu-imp-pct").value          = parseFloat(apu.imprevistos_pct)       || 0;
+    document.getElementById("apu-util-pct").value         = parseFloat(apu.utilidad_pct)          || 0;
+    document.getElementById("apu-desperdicio-pct").value  = parseFloat(apu.desperdicio_pct)       || 0;
+    document.getElementById("apu-hm-pct").value           = parseFloat(apu.herramienta_menor_pct) || 0;
 
     ["body-equipos","body-materiales","body-mano-obra","body-otros"]
       .forEach(id => document.getElementById(id).innerHTML = "");
@@ -1120,7 +1428,7 @@
   function limpiarFormulario() {
     ["f-cliente","f-direccion","f-actividad","f-item","f-unidad"].forEach(id =>
       document.getElementById(id).value = "");
-    ["apu-adm-pct","apu-imp-pct","apu-util-pct"].forEach(id =>
+    ["apu-adm-pct","apu-imp-pct","apu-util-pct","apu-desperdicio-pct","apu-hm-pct"].forEach(id =>
       document.getElementById(id).value = 0);
     ["body-equipos","body-materiales","body-mano-obra","body-otros"].forEach(id =>
       document.getElementById(id).innerHTML = "");
@@ -1134,15 +1442,17 @@
   function guardarCabeza() {
     asegurarAPUluego(() => {
       const datos = {
-        codigo_item:        document.getElementById("f-item").value,
-        descripcion:        document.getElementById("f-item").value,
-        unidad:             document.getElementById("f-unidad").value,
-        cliente:            document.getElementById("f-cliente").value,
-        direccion:          document.getElementById("f-direccion").value || "",
-        actividad:          document.getElementById("f-actividad").value,
-        administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
-        imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
-        utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
+        codigo_item:           document.getElementById("f-item").value,
+        descripcion:           document.getElementById("f-item").value,
+        unidad:                document.getElementById("f-unidad").value,
+        cliente:               document.getElementById("f-cliente").value,
+        direccion:             document.getElementById("f-direccion").value || "",
+        actividad:             document.getElementById("f-actividad").value,
+        administracion_pct:    parseFloat(document.getElementById("apu-adm-pct").value)         || 0,
+        imprevistos_pct:       parseFloat(document.getElementById("apu-imp-pct").value)         || 0,
+        utilidad_pct:          parseFloat(document.getElementById("apu-util-pct").value)        || 0,
+        desperdicio_pct:       parseFloat(document.getElementById("apu-desperdicio-pct").value) || 0,
+        herramienta_menor_pct: parseFloat(document.getElementById("apu-hm-pct").value)          || 0,
       };
       google.script.run
         .withSuccessHandler(() => setEstado("Guardado ✓"))
@@ -1157,15 +1467,17 @@
       btnSetEstado(BTNS, "loading", "⏳ Guardando...");
       setEstado("Guardando...");
       const datos = {
-        codigo_item:        document.getElementById("f-item").value,
-        descripcion:        document.getElementById("f-item").value,
-        unidad:             document.getElementById("f-unidad").value,
-        cliente:            document.getElementById("f-cliente").value,
-        direccion:          document.getElementById("f-direccion").value || "",
-        actividad:          document.getElementById("f-actividad").value,
-        administracion_pct: parseFloat(document.getElementById("apu-adm-pct").value)  || 0,
-        imprevistos_pct:    parseFloat(document.getElementById("apu-imp-pct").value)  || 0,
-        utilidad_pct:       parseFloat(document.getElementById("apu-util-pct").value) || 0,
+        codigo_item:           document.getElementById("f-item").value,
+        descripcion:           document.getElementById("f-item").value,
+        unidad:                document.getElementById("f-unidad").value,
+        cliente:               document.getElementById("f-cliente").value,
+        direccion:             document.getElementById("f-direccion").value || "",
+        actividad:             document.getElementById("f-actividad").value,
+        administracion_pct:    parseFloat(document.getElementById("apu-adm-pct").value)         || 0,
+        imprevistos_pct:       parseFloat(document.getElementById("apu-imp-pct").value)         || 0,
+        utilidad_pct:          parseFloat(document.getElementById("apu-util-pct").value)        || 0,
+        desperdicio_pct:       parseFloat(document.getElementById("apu-desperdicio-pct").value) || 0,
+        herramienta_menor_pct: parseFloat(document.getElementById("apu-hm-pct").value)          || 0,
       };
       google.script.run
         .withSuccessHandler(() => {
@@ -1396,10 +1708,16 @@
 
   function recalcularTotalesUI() {
     const suma = tipo => Object.values(filas[tipo]).reduce((a, f) => a + (f ? (f.vp || 0) : 0), 0);
-    const subEq  = suma("EQUIPO");
-    const subMat = suma("MATERIAL");
-    const subMo  = suma("MANO_OBRA");
-    const subOt  = suma("OTRO");
+    const baseEq  = suma("EQUIPO");
+    const baseMat = suma("MATERIAL");
+    const subMo   = suma("MANO_OBRA");
+    const subOt   = suma("OTRO");
+
+    const desperdicioPct = parseFloat(document.getElementById("apu-desperdicio-pct").value) || 0;
+    const hmPct          = parseFloat(document.getElementById("apu-hm-pct").value)          || 0;
+    const subMat = baseMat * (1 + desperdicioPct / 100);
+    const hmVal  = subMo * hmPct / 100;
+    const subEq  = baseEq + hmVal;
     const neto   = subEq + subMat + subMo + subOt;
 
     document.getElementById("sub-equipos").textContent    = COP(subEq);
@@ -2441,26 +2759,17 @@
     bdTabActual = tab;
     ["MAT","MO","EQ"].forEach(t => {
       const btn = document.getElementById("bd-tab-" + t);
-      if (t === tab) {
-        btn.style.background   = "#1a237e";
-        btn.style.color        = "#fff";
-        btn.style.borderColor  = "#1a237e";
-        btn.style.fontWeight   = "700";
-      } else {
-        btn.style.background   = "#fff";
-        btn.style.color        = "#555";
-        btn.style.borderColor  = "#ccc";
-        btn.style.fontWeight   = "500";
-      }
+      btn.classList.toggle("active", t === tab);
     });
     cancelarFormBD();
     document.getElementById("bd-search").value = "";
+    document.getElementById("bd-btn-prest-masivo").style.display = (tab === "MO") ? "inline-flex" : "none";
     bdCargar();
   }
 
   function bdCargar() {
     document.getElementById("bd-tbody").innerHTML =
-      '<tr><td colspan="10" style="text-align:center;padding:24px;color:#888">Cargando...</td></tr>';
+      '<tr><td colspan="10"><div class="bd-loading">Cargando</div></td></tr>';
     document.getElementById("bd-count").textContent = "";
     const fn = { MAT: "cargarMaterialesBD", MO: "cargarManoObra", EQ: "cargarEquipos" }[bdTabActual];
     google.script.run
@@ -2471,19 +2780,20 @@
       })
       .withFailureHandler(err => {
         document.getElementById("bd-tbody").innerHTML =
-          `<tr><td colspan="10" style="color:#c62828;padding:16px">Error: ${err.message}</td></tr>`;
+          `<tr><td colspan="10"><div class="bd-empty"><div class="bd-empty-icon">⚠</div><div class="bd-empty-text" style="color:#c62828">Error: ${err.message}</div></div></td></tr>`;
       })
       [fn]();
   }
 
   function bdRenderHeader() {
     const cols = {
-      MAT: ["CÓDIGO","CATEGORÍA","NOMBRE","UND","PRECIO SIN IVA","PROVEEDOR","",""],
-      MO:  ["DESCRIPCIÓN","SALARIO MENSUAL","PREST. %","COSTO/DÍA","",""],
-      EQ:  ["NOMBRE","TARIFA/DÍA","",""],
+      MAT: [["CÓDIGO","left"],["CATEGORÍA","left"],["NOMBRE","left"],["UND","center"],["PRECIO SIN IVA","right"],["PROVEEDOR","left"],["",""],["",""]],
+      MO:  [["DESCRIPCIÓN","left"],["SALARIO MENSUAL","right"],["PREST. %","center"],["COSTO/DÍA","right"],["",""],["",""]],
+      EQ:  [["NOMBRE","left"],["TARIFA/DÍA","right"],["",""],["",""]],
     };
     document.getElementById("bd-thead").innerHTML =
-      "<tr>" + (cols[bdTabActual] || []).map(h => `<th>${h}</th>`).join("") + "</tr>";
+      "<tr>" + (cols[bdTabActual] || []).map(([h, align]) =>
+        `<th style="text-align:${align || 'left'}">${h}</th>`).join("") + "</tr>";
   }
 
   function filtrarBD() {
@@ -2502,7 +2812,7 @@
   function bdRenderFilas(items) {
     const tbody = document.getElementById("bd-tbody");
     if (!items.length) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:24px;color:#888">Sin resultados</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10"><div class="bd-empty"><div class="bd-empty-icon">📭</div><div class="bd-empty-text">Sin resultados</div></div></td></tr>`;
       return;
     }
     tbody.innerHTML = items.map(item => {
@@ -2511,24 +2821,23 @@
       const esc    = nombre.replace(/'/g, "\\'");
       const tipo   = { MAT: "MATERIAL", MO: "MANO_OBRA", EQ: "EQUIPO" }[bdTabActual];
       const acciones = `
-        <td><button class="btn-sel" onclick="mostrarFormBD(${id})"
-              style="background:#1565c0;padding:3px 10px;font-size:11px">✏ Editar</button></td>
-        <td><button class="btn-del" onclick="eliminarRecursoBD('${tipo}',${id},'${esc}')">✕</button></td>`;
+        <td class="center"><button class="bd-row-action bd-row-edit" onclick="mostrarFormBD(${id})" title="Editar">✏ Editar</button></td>
+        <td class="center"><button class="bd-row-action bd-row-del" onclick="eliminarRecursoBD('${tipo}',${id},'${esc}')" title="Eliminar">✕</button></td>`;
 
       if (bdTabActual === "MAT") return `<tr>
         <td class="mono">${item.codigo || "—"}</td>
         <td><span class="badge">${item.categoria || "—"}</span></td>
         <td>${item.nombre}</td>
-        <td>${item.unidad || "—"}</td>
+        <td class="center" style="color:#6b7390">${item.unidad || "—"}</td>
         <td class="num">${COP(item.precio_sin_iva)}</td>
-        <td style="color:#777;font-size:11px">${item.proveedor || "—"}</td>
+        <td style="color:#6b7390;font-size:11px">${item.proveedor || "—"}</td>
         ${acciones}
       </tr>`;
 
       if (bdTabActual === "MO") return `<tr>
         <td>${item.descripcion}</td>
         <td class="num">${COP(item.salario_mensual)}</td>
-        <td style="text-align:center">${item.prestaciones_pct || 54}%</td>
+        <td class="center"><span class="badge">${item.prestaciones_pct || 54}%</span></td>
         <td class="num">${COP(item.costo_dia)}</td>
         ${acciones}
       </tr>`;
@@ -2559,15 +2868,14 @@
     const catList = `<datalist id="bd-cats">${cats.map(c => `<option value="${c}">`).join("")}</datalist>`;
 
     const inp = (id_, label, val, opts = "") =>
-      `<div class="form-group">
-        <label>${label}</label>
-        <input id="${id_}" ${opts} value="${String(val ?? '').replace(/"/g,'&quot;')}"
-               style="width:100%;border:1px solid #c5cae9;border-radius:4px;padding:6px 8px;font-size:12px;outline:none">
+      `<div>
+        <label class="bd-edit-label">${label}</label>
+        <input id="${id_}" ${opts} class="bd-edit-input" value="${String(val ?? '').replace(/"/g,'&quot;')}">
        </div>`;
 
     if (bdTabActual === "MAT") {
       fields.innerHTML = catList
-        + `<div style="display:grid;grid-template-columns:90px 180px 1fr 70px 130px 140px;gap:10px;width:100%">`
+        + `<div style="display:grid;grid-template-columns:100px 200px 1fr 80px 140px 160px;gap:14px;width:100%">`
         + inp("bd-f-codigo",    "CÓDIGO",        item.codigo    || "")
         + inp("bd-f-categoria", "CATEGORÍA",     item.categoria || "", 'list="bd-cats"')
         + inp("bd-f-nombre",    "NOMBRE",        item.nombre    || "")
@@ -2578,7 +2886,7 @@
 
     } else if (bdTabActual === "MO") {
       fields.innerHTML =
-        `<div style="display:grid;grid-template-columns:1fr 180px 130px;gap:10px;width:100%">`
+        `<div style="display:grid;grid-template-columns:1fr 200px 150px;gap:14px;width:100%">`
         + inp("bd-f-descripcion", "DESCRIPCIÓN",       item.descripcion     || "")
         + inp("bd-f-salario",     "SALARIO MENSUAL",   item.salario_mensual || 0,    'type="number" min="0"')
         + inp("bd-f-prest",       "PRESTACIONES %",    item.prestaciones_pct || 54, 'type="number" min="0" max="200"')
@@ -2588,13 +2896,13 @@
       const partOpts = ["Mano de Obra e Instalación","Transporte y Logística","Suministro Unidades Exteriores","Suministro Unidades Interiores","Otros"]
         .map(p => `<option value="${p}" ${(item.partida||"Mano de Obra e Instalación")===p?"selected":""}>${p}</option>`).join("");
       fields.innerHTML =
-        `<div style="display:grid;grid-template-columns:1fr 180px 260px;gap:10px;width:100%">`
+        `<div style="display:grid;grid-template-columns:1fr 200px 280px;gap:14px;width:100%">`
         + inp("bd-f-nombre",  "NOMBRE",     item.nombre     || "")
         + inp("bd-f-tarifa",  "TARIFA/DÍA", item.tarifa_dia || 0, 'type="number" min="0"')
-        + `<div class="form-group"><label>PARTIDA (excepción)</label>
-             <select id="bd-f-partida" style="width:100%;border:1px solid #c5cae9;border-radius:4px;padding:6px 8px;font-size:12px">
-               ${partOpts}
-             </select></div>`
+        + `<div>
+             <label class="bd-edit-label">PARTIDA (excepción)</label>
+             <select id="bd-f-partida" class="bd-edit-input">${partOpts}</select>
+           </div>`
         + `</div>`;
     }
 
@@ -2662,6 +2970,39 @@
         .withFailureHandler(err => showToast("Error: " + err.message, "error"))
         .eliminarRecurso(tipo, id);
     });
+  }
+
+  // ═══ APLICAR PRESTACIONES SOCIALES A TODOS LOS ROLES ══════════════════════
+  function aplicarPrestacionesMasivo() {
+    const valor = prompt(
+      "Aplicar el mismo % de prestaciones sociales a TODOS los roles de Mano de Obra.\n\n" +
+      "Esto sobreescribe el % actual de cada rol y recalcula su costo/día.\n\n" +
+      "Nuevo % de prestaciones:",
+      "54"
+    );
+    if (valor === null) return;
+    const pct = parseFloat(valor);
+    if (isNaN(pct) || pct < 0 || pct > 200) {
+      showToast("Valor inválido. Ingresa un número entre 0 y 200.", "error");
+      return;
+    }
+    showConfirm(
+      `¿Aplicar ${pct}% a TODOS los roles? Los costos por día se recalcularán automáticamente.`,
+      () => {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res && res.ok) {
+              showToast(`✓ ${res.count} roles actualizados al ${pct}%.`, "success");
+              bdCargar();
+            } else {
+              showToast("Error: " + (res && res.error ? res.error : "desconocido"), "error");
+            }
+          })
+          .withFailureHandler(err => showToast("Error: " + err.message, "error"))
+          .actualizarPrestacionesPctMasivo(pct);
+      },
+      "Aplicar"
+    );
   }
 
   // ═══ FIRMA DIGITAL ════════════════════════════════════════════════════════════

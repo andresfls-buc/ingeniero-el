@@ -80,6 +80,32 @@ function migrarDireccionAPU() {
   SpreadsheetApp.getUi().alert("✅ Columna 'direccion' agregada a la hoja APU.\n\nVuelve a correr 'formatearHojas' para aplicar el formato.");
 }
 
+// Agrega desperdicio_pct y herramienta_menor_pct a la hoja APU si no existen.
+function migrarDesperdicioHMenAPU() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("APU");
+  if (!sheet) { SpreadsheetApp.getUi().alert("Hoja APU no encontrada."); return; }
+
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  const nuevas  = ["desperdicio_pct", "herramienta_menor_pct"];
+  let added = 0;
+
+  nuevas.forEach(col => {
+    if (!headers.includes(col)) {
+      const newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue(col);
+      added++;
+    }
+  });
+
+  SpreadsheetApp.getUi().alert(
+    added > 0
+      ? "✅ " + added + " columna(s) agregada(s) a APU. Los APUs existentes quedan con 0% (sin cambios de cálculo)."
+      : "Las columnas ya existían. No se hicieron cambios."
+  );
+}
+
 function migrarColumnaIVA() {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Cotizaciones");
@@ -159,7 +185,8 @@ function setupDatabase() {
     "actividad", "subtotal_equipos", "subtotal_materiales",
     "subtotal_mano_obra", "subtotal_otros", "costo_neto",
     "administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct", "valor_total",
-    "fecha"
+    "fecha",
+    "desperdicio_pct", "herramienta_menor_pct"
   ]);
 
   createSheet(ss, "APU_Items", [

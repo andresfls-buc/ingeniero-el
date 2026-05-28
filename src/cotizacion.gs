@@ -149,6 +149,19 @@ function llenarHojaCotizacion(sheet, cot) {
   const BORDE    = "#dddddd";
   const NC       = 6;
 
+  // Lookup de códigos de materiales (id → codigo) para la columna ÍTEM de los subitems
+  const ssCot = SpreadsheetApp.getActiveSpreadsheet();
+  const materialesCodigoById = {};
+  sheetToObjects(ssCot, "Materiales").forEach(m => {
+    materialesCodigoById[String(m.id)] = m.codigo || "";
+  });
+
+  // Lookup de prestaciones por rol de MO para etiqueta real del encabezado
+  const manoObraPrestById = {};
+  sheetToObjects(ssCot, "ManoObra").forEach(m => {
+    manoObraPrestById[String(m.id)] = parseFloat(m.prestaciones_pct) || 0;
+  });
+
   sheet.setColumnWidth(1, 45);
   sheet.setColumnWidth(2, 285);
   sheet.setColumnWidth(3, 68);
@@ -236,6 +249,12 @@ function llenarHojaCotizacion(sheet, cot) {
     const cant   = parseFloat(item.cantidad)    || 1;
     const total  = cant * precio;
 
+    const desperdicioPct    = parseFloat(item.desperdicio_pct)       || 0;
+    const hmPct             = parseFloat(item.herramienta_menor_pct) || 0;
+    const desperdicioFactor = 1 + desperdicioPct / 100;
+    const subMoBase         = (item.mano_obra || []).reduce((s, it) => s + (parseFloat(it.valor_parcial) || 0), 0);
+    const hmValor           = subMoBase * hmPct / 100;
+
     // Fila principal del APU
     sheet.setRowHeight(r, 18);
     sheet.getRange(r, 1, 1, NC)
@@ -261,12 +280,19 @@ function llenarHojaCotizacion(sheet, cot) {
     // Sub-secciones del APU
     SEC.forEach(sec => {
       const subitems = item[sec.key] || [];
-      if (!subitems.length) return;
+      const renderHM = sec.key === "equipos" && hmPct > 0;
+      if (!subitems.length && !renderHM) return;
 
-      // Encabezado de sección
+      // Encabezado de sección — con sufijo informativo
+      let labelSec = sec.label;
+      if (sec.key === "materiales" && desperdicioPct > 0) {
+        labelSec += "   (Incluye factor de desperdicio del " + (desperdicioPct % 1 === 0 ? desperdicioPct.toFixed(0) : desperdicioPct.toString()) + "%)";
+      } else if (sec.key === "mano_obra") {
+        labelSec += "   " + construirSufijoPrestaciones(item.mano_obra, manoObraPrestById);
+      }
       sheet.setRowHeight(r, 12);
       sheet.getRange(r, 1, 1, NC).merge()
-        .setValue("  " + sec.label)
+        .setValue("  " + labelSec)
         .setBackground(GRIS_CLR).setFontColor("#333333")
         .setFontWeight("bold").setFontSize(8).setFontStyle("italic")
         .setHorizontalAlignment("left").setVerticalAlignment("middle")
@@ -278,7 +304,10 @@ function llenarHojaCotizacion(sheet, cot) {
         const bg = i % 2 === 0 ? "#ffffff" : "#fafafa";
         const cantTexto = it.cantidad != null ? it.cantidad : "";
         const mostrarUnidad = sec.key === "materiales";
-        sheet.getRange(r, 1).setValue("").setBackground(bg)
+        sheet.getRange(r, 1).setValue(resolverCodigoItem(it, materialesCodigoById))
+          .setFontSize(7).setFontColor("#666666")
+          .setHorizontalAlignment("center").setVerticalAlignment("middle")
+          .setBackground(bg)
           .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
         if (mostrarUnidad) {
           sheet.getRange(r, 2).setValue("      " + (it.descripcion_manual || "—"))
@@ -303,7 +332,9 @@ function llenarHojaCotizacion(sheet, cot) {
           .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("right")
           .setVerticalAlignment("middle").setBackground(bg)
           .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
-        sheet.getRange(r, 6).setValue(parseFloat(it.valor_parcial) || 0).setNumberFormat(MONEY)
+        const vpBase     = parseFloat(it.valor_parcial) || 0;
+        const vpMostrado = sec.key === "materiales" ? vpBase * desperdicioFactor : vpBase;
+        sheet.getRange(r, 6).setValue(vpMostrado).setNumberFormat(MONEY)
           .setFontSize(8).setFontWeight("bold").setFontColor("#111111").setHorizontalAlignment("right")
           .setVerticalAlignment("middle").setBackground(bg)
           .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
@@ -311,8 +342,37 @@ function llenarHojaCotizacion(sheet, cot) {
         r++;
       });
 
-      // Subtotal de sección
-      const secSubtotal = subitems.reduce((s, it) => s + (parseFloat(it.valor_parcial) || 0), 0);
+      // Línea automática Herramienta Menor (HM) al final de Equipos
+      if (renderHM) {
+        const bg = subitems.length % 2 === 0 ? "#ffffff" : "#fafafa";
+        sheet.setRowHeight(r, 13);
+        sheet.getRange(r, 1).setValue("HM")
+          .setFontSize(7).setFontWeight("bold").setFontColor("#666666")
+          .setHorizontalAlignment("center").setVerticalAlignment("middle").setBackground(bg)
+          .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 2, 1, 2).merge().setValue("      Herramienta Menor (% MO)")
+          .setFontSize(8).setFontColor("#222222").setHorizontalAlignment("left")
+          .setVerticalAlignment("middle").setBackground(bg)
+          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 4).setValue(hmPct / 100).setNumberFormat("0.##%")
+          .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("right")
+          .setVerticalAlignment("middle").setBackground(bg)
+          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 5).setValue(subMoBase).setNumberFormat(MONEY)
+          .setFontSize(8).setFontColor("#444444").setHorizontalAlignment("right")
+          .setVerticalAlignment("middle").setBackground(bg)
+          .setBorder(true, null, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(r, 6).setValue(hmValor).setNumberFormat(MONEY)
+          .setFontSize(8).setFontWeight("bold").setFontColor("#111111").setHorizontalAlignment("right")
+          .setVerticalAlignment("middle").setBackground(bg)
+          .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+        r++;
+      }
+
+      // Subtotal de sección (con desperdicio en materiales / HM en equipos)
+      let secSubtotal = subitems.reduce((s, it) => s + (parseFloat(it.valor_parcial) || 0), 0);
+      if (sec.key === "materiales") secSubtotal *= desperdicioFactor;
+      else if (renderHM)             secSubtotal += hmValor;
       sheet.setRowHeight(r, 15);
       sheet.getRange(r, 1, 1, 5).merge()
         .setValue("Subtotal " + sec.label)
@@ -577,6 +637,31 @@ function getCotizacionCompleta(cotId) {
     cot.items.forEach(item => {
       item.equipos = []; item.materiales = []; item.mano_obra = []; item.otros = [];
     });
+  }
+
+  // Adjuntar desperdicio_pct y herramienta_menor_pct por APU
+  const apuSheet = ss.getSheetByName("APU");
+  if (apuSheet) {
+    const apuData  = apuSheet.getDataRange().getValues();
+    if (apuData.length > 1) {
+      const apuH    = apuData[0];
+      const idxId   = apuH.indexOf("id");
+      const idxDesp = apuH.indexOf("desperdicio_pct");
+      const idxHm   = apuH.indexOf("herramienta_menor_pct");
+      const apuPctById = {};
+      for (let i = 1; i < apuData.length; i++) {
+        const id = apuData[i][idxId];
+        apuPctById[String(id)] = {
+          desperdicio_pct:       idxDesp >= 0 ? (parseFloat(apuData[i][idxDesp]) || 0) : 0,
+          herramienta_menor_pct: idxHm   >= 0 ? (parseFloat(apuData[i][idxHm])   || 0) : 0,
+        };
+      }
+      cot.items.forEach(item => {
+        const p = apuPctById[String(item.apu_id)] || { desperdicio_pct: 0, herramienta_menor_pct: 0 };
+        item.desperdicio_pct       = p.desperdicio_pct;
+        item.herramienta_menor_pct = p.herramienta_menor_pct;
+      });
+    }
   }
 
   return cot;
