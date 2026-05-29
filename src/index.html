@@ -2236,7 +2236,6 @@
       document.querySelectorAll(`[data-cotitem-id="${id}"]`).forEach(el => el.remove());
       delete cotItems[id];
       recalcularTotalCot();
-      renumerarFilasCot();
       google.script.run.eliminarItemCotizacion(id);
     }, "Eliminar");
   }
@@ -2278,13 +2277,6 @@
       .actualizarCotizacion(cotActual.id, datos);
   }
 
-  function renumerarFilasCot() {
-    let num = 1;
-    document.querySelectorAll("#body-cuadro tr.crow-main").forEach(row => {
-      const span = row.querySelector(".crow-num");
-      if (span) span.textContent = num++;
-    });
-  }
 
   function cambiarCantidadCot(id, val) {
     const item = cotItems[id];
