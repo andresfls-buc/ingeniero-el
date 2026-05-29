@@ -34,9 +34,9 @@ function getPartidasCotizacion(cotId) {
 
 // ─── DESCARGAR PDF (base64, descarga directa en el navegador) ────────────────
 
-function descargarPDFBase64(cotId) {
+function descargarPDFBase64(cotId, tipo) {
   const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const cot = getCotizacionCompleta(cotId);
+  const { cot, render } = _prepararCotizacion(cotId, tipo);
   if (!cot) return { ok: false, error: "Cotización no encontrada" };
 
   const tmpName = "_cot_dl_tmp_";
@@ -44,7 +44,7 @@ function descargarPDFBase64(cotId) {
   if (tmp) ss.deleteSheet(tmp);
   tmp = ss.insertSheet(tmpName);
 
-  llenarHojaCotizacion(tmp, cot);
+  render(tmp, cot);
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
@@ -66,9 +66,9 @@ function descargarPDFBase64(cotId) {
 
 // ─── EXPORTAR PDF ────────────────────────────────────────────────────────────
 
-function exportarCotizacionPDF(cotId) {
+function exportarCotizacionPDF(cotId, tipo) {
   const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const cot = getCotizacionCompleta(cotId);
+  const { cot, render } = _prepararCotizacion(cotId, tipo);
   if (!cot) return { ok: false, error: "Cotización no encontrada" };
 
   const tmpName = "_cot_pdf_";
@@ -76,7 +76,7 @@ function exportarCotizacionPDF(cotId) {
   if (tmp) ss.deleteSheet(tmp);
   tmp = ss.insertSheet(tmpName);
 
-  llenarHojaCotizacion(tmp, cot);
+  render(tmp, cot);
   SpreadsheetApp.flush();
 
   const url = "https://docs.google.com/spreadsheets/d/" + ss.getId()
@@ -790,10 +790,10 @@ function eliminarCotizacion(cotId) {
 
 // ─── ENVIAR COTIZACIÓN POR CORREO ─────────────────────────────────────────────
 
-function enviarCotizacionEmail(cotId, emailDestino) {
+function enviarCotizacionEmail(cotId, emailDestino, tipo) {
   try {
     const ss  = SpreadsheetApp.getActiveSpreadsheet();
-    const cot = getCotizacionCompleta(cotId);
+    const { cot, render } = _prepararCotizacion(cotId, tipo);
     if (!cot) return { ok: false, error: "Cotización no encontrada" };
 
     // Generar PDF
@@ -801,7 +801,7 @@ function enviarCotizacionEmail(cotId, emailDestino) {
     let tmp = ss.getSheetByName(tmpName);
     if (tmp) ss.deleteSheet(tmp);
     tmp = ss.insertSheet(tmpName);
-    llenarHojaCotizacion(tmp, cot);
+    render(tmp, cot);
     SpreadsheetApp.flush();
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
@@ -867,10 +867,10 @@ function enviarCotizacionEmail(cotId, emailDestino) {
 
 // ─── ENVIAR EMAIL + GUARDAR PDF EN DRIVE (una sola operación) ────────────────
 
-function enviarYGuardarPDF(cotId, emailDestino) {
+function enviarYGuardarPDF(cotId, emailDestino, tipo) {
   try {
     const ss  = SpreadsheetApp.getActiveSpreadsheet();
-    const cot = getCotizacionCompleta(cotId);
+    const { cot, render } = _prepararCotizacion(cotId, tipo);
     if (!cot) return { ok: false, error: "Cotización no encontrada" };
 
     // Generar PDF una sola vez
@@ -878,7 +878,7 @@ function enviarYGuardarPDF(cotId, emailDestino) {
     let tmp = ss.getSheetByName(tmpName);
     if (tmp) ss.deleteSheet(tmp);
     tmp = ss.insertSheet(tmpName);
-    llenarHojaCotizacion(tmp, cot);
+    render(tmp, cot);
     SpreadsheetApp.flush();
 
     const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
@@ -1354,4 +1354,13 @@ function llenarHojaCotizacionCliente(sheet, cot) {
       .setFontSize(9).setFontWeight("bold").setVerticalAlignment("top")
       .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
   }
+}
+
+// ─── HELPER: ELEGIR DATOS + RENDERER SEGÚN TIPO ────────────────────────────────
+// Elige datos + renderer según tipo ("cliente" por defecto).
+function _prepararCotizacion(cotId, tipo) {
+  if (tipo === "interna") {
+    return { cot: getCotizacionCompleta(cotId), render: llenarHojaCotizacion };
+  }
+  return { cot: getCotizacionCliente(cotId), render: llenarHojaCotizacionCliente };
 }
