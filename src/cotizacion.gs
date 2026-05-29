@@ -1068,3 +1068,38 @@ function getCotizacionCliente(cotId) {
 
   return cot;
 }
+
+// ─── ACTUALIZAR ÍTEM DE COTIZACIÓN (campos múltiples) ────────────────────────────
+// Permite editar item_num, descripcion, unidad, cantidad y precio_apu.
+// Recalcula valor_total (= cantidad * precio_apu) y los totales de la cotización.
+function actualizarItemCotizacion(itemId, cambios) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Cotizacion_Items");
+  const data  = sheet.getDataRange().getValues();
+  const h     = data[0];
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == itemId) {
+      const row   = [...data[i]];
+      const cotId = row[h.indexOf("cotizacion_id")];
+
+      ["item_num", "descripcion", "unidad"].forEach(campo => {
+        if (cambios[campo] !== undefined) {
+          const c = h.indexOf(campo);
+          if (c >= 0) row[c] = cambios[campo];
+        }
+      });
+
+      const cant   = parseFloat(cambios.cantidad   ?? row[h.indexOf("cantidad")])   || 0;
+      const precio = parseFloat(cambios.precio_apu ?? row[h.indexOf("precio_apu")]) || 0;
+      row[h.indexOf("cantidad")]    = cant;
+      row[h.indexOf("precio_apu")]  = precio;
+      row[h.indexOf("valor_total")] = cant * precio;
+
+      sheet.getRange(i + 1, 1, 1, h.length).setValues([row]);
+      recalcularCotizacion(ss, cotId);
+      return { ok: true, valor_total: cant * precio };
+    }
+  }
+  return { ok: false };
+}
