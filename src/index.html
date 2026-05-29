@@ -1311,6 +1311,14 @@
     style: 'currency', currency: 'COP', maximumFractionDigits: 0
   }).format(v || 0);
 
+  // id → "001" (espejo cliente de _padId en apu.gs)
+  const padId = id => {
+    const n = parseInt(id);
+    return isNaN(n) ? String(id ?? "") : String(n).padStart(3, "0");
+  };
+  // Código visible de un material: MA-<id> autogenerado (consistente con EQ-/MO-/OT-)
+  const codigoMaterial = id => "MA-" + padId(id);
+
   // ── ESTADO GLOBAL ──
   const PARTIDAS_FIJAS = [
     "Suministro Unidades Exteriores",
@@ -1824,7 +1832,9 @@
 
     if (tipoModal === "MATERIAL") {
       res = (bd?.materiales || []).filter(m =>
-        (!q   || (m.nombre || "").toLowerCase().includes(q) || (m.codigo || "").toLowerCase().includes(q)) &&
+        (!q   || (m.nombre || "").toLowerCase().includes(q)
+              || (m.codigo || "").toLowerCase().includes(q)
+              || codigoMaterial(m.id).toLowerCase().includes(q)) &&
         (!cat || m.categoria === cat)
       );
     } else if (tipoModal === "EQUIPO") {
@@ -1852,7 +1862,7 @@
       const id = item.id;
       if (tipoModal === "MATERIAL") {
         return `<tr>
-          <td class="mono">${item.codigo || "—"}</td>
+          <td class="mono">${codigoMaterial(item.id)}</td>
           <td><span class="badge">${item.categoria || ""}</span></td>
           <td>${item.nombre}</td>
           <td>${item.unidad}</td>
@@ -2800,7 +2810,7 @@
     const q = (document.getElementById("bd-search").value || "").toLowerCase().trim();
     const items = !q ? bdDatos : bdDatos.filter(item => {
       const txt = bdTabActual === "MAT"
-        ? (item.nombre + " " + (item.codigo || "") + " " + (item.categoria || ""))
+        ? (item.nombre + " " + codigoMaterial(item.id) + " " + (item.codigo || "") + " " + (item.categoria || ""))
         : bdTabActual === "MO" ? (item.descripcion || "")
         : (item.nombre || "");
       return txt.toLowerCase().includes(q);
@@ -2825,7 +2835,7 @@
         <td class="center"><button class="bd-row-action bd-row-del" onclick="eliminarRecursoBD('${tipo}',${id},'${esc}')" title="Eliminar">✕</button></td>`;
 
       if (bdTabActual === "MAT") return `<tr>
-        <td class="mono">${item.codigo || "—"}</td>
+        <td class="mono">${codigoMaterial(item.id)}</td>
         <td><span class="badge">${item.categoria || "—"}</span></td>
         <td>${item.nombre}</td>
         <td class="center" style="color:#6b7390">${item.unidad || "—"}</td>
@@ -2867,18 +2877,24 @@
     const cats = [...new Set(bdDatos.map(m => m.categoria).filter(Boolean))].sort();
     const catList = `<datalist id="bd-cats">${cats.map(c => `<option value="${c}">`).join("")}</datalist>`;
 
-    const inp = (id_, label, val, opts = "") =>
-      `<div>
+    const inp = (id_, label, val, opts = "", wrapStyle = "") =>
+      `<div${wrapStyle ? ` style="${wrapStyle}"` : ""}>
         <label class="bd-edit-label">${label}</label>
         <input id="${id_}" ${opts} class="bd-edit-input" value="${String(val ?? '').replace(/"/g,'&quot;')}">
        </div>`;
 
     if (bdTabActual === "MAT") {
+      const codDisplay = (id !== null && id !== undefined)
+        ? codigoMaterial(item.id)
+        : "se asigna al guardar";
       fields.innerHTML = catList
-        + `<div style="display:grid;grid-template-columns:100px 200px 1fr 80px 140px 160px;gap:14px;width:100%">`
-        + inp("bd-f-codigo",    "CÓDIGO",        item.codigo    || "")
+        + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;width:100%">`
+        + `<div>
+             <label class="bd-edit-label">CÓDIGO</label>
+             <input class="bd-edit-input" value="${codDisplay.replace(/"/g,'&quot;')}" readonly disabled style="color:#6b7390;background:#f5f5f5">
+           </div>`
         + inp("bd-f-categoria", "CATEGORÍA",     item.categoria || "", 'list="bd-cats"')
-        + inp("bd-f-nombre",    "NOMBRE",        item.nombre    || "")
+        + inp("bd-f-nombre",    "NOMBRE",        item.nombre    || "", "", "grid-column:span 2")
         + inp("bd-f-unidad",    "UNIDAD",        item.unidad    || "")
         + inp("bd-f-precio",    "PRECIO SIN IVA",item.precio_sin_iva || 0, 'type="number" min="0"')
         + inp("bd-f-proveedor", "PROVEEDOR",     item.proveedor || "")
@@ -2886,8 +2902,8 @@
 
     } else if (bdTabActual === "MO") {
       fields.innerHTML =
-        `<div style="display:grid;grid-template-columns:1fr 200px 150px;gap:14px;width:100%">`
-        + inp("bd-f-descripcion", "DESCRIPCIÓN",       item.descripcion     || "")
+        `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;width:100%">`
+        + inp("bd-f-descripcion", "DESCRIPCIÓN",       item.descripcion     || "", "", "grid-column:span 2")
         + inp("bd-f-salario",     "SALARIO MENSUAL",   item.salario_mensual || 0,    'type="number" min="0"')
         + inp("bd-f-prest",       "PRESTACIONES %",    item.prestaciones_pct || 54, 'type="number" min="0" max="200"')
         + `</div>`;
@@ -2896,8 +2912,8 @@
       const partOpts = ["Mano de Obra e Instalación","Transporte y Logística","Suministro Unidades Exteriores","Suministro Unidades Interiores","Otros"]
         .map(p => `<option value="${p}" ${(item.partida||"Mano de Obra e Instalación")===p?"selected":""}>${p}</option>`).join("");
       fields.innerHTML =
-        `<div style="display:grid;grid-template-columns:1fr 200px 280px;gap:14px;width:100%">`
-        + inp("bd-f-nombre",  "NOMBRE",     item.nombre     || "")
+        `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;width:100%">`
+        + inp("bd-f-nombre",  "NOMBRE",     item.nombre     || "", "", "grid-column:span 2")
         + inp("bd-f-tarifa",  "TARIFA/DÍA", item.tarifa_dia || 0, 'type="number" min="0"')
         + `<div>
              <label class="bd-edit-label">PARTIDA (excepción)</label>
@@ -2923,7 +2939,7 @@
     if (bdTabActual === "MAT") {
       tipo  = "MATERIAL";
       datos = {
-        codigo:        (document.getElementById("bd-f-codigo").value    || "").trim(),
+        // codigo NO se envía: es MA-<id> autogenerado; el valor original se preserva en la hoja.
         categoria:     (document.getElementById("bd-f-categoria").value || "").trim(),
         nombre:        (document.getElementById("bd-f-nombre").value    || "").trim(),
         unidad:        (document.getElementById("bd-f-unidad").value    || "").trim(),
@@ -2974,34 +2990,37 @@
 
   // ═══ APLICAR PRESTACIONES SOCIALES A TODOS LOS ROLES ══════════════════════
   function aplicarPrestacionesMasivo() {
-    const valor = prompt(
+    showPrompt(
       "Aplicar el mismo % de prestaciones sociales a TODOS los roles de Mano de Obra.\n\n" +
       "Esto sobreescribe el % actual de cada rol y recalcula su costo/día.\n\n" +
       "Nuevo % de prestaciones:",
-      "54"
-    );
-    if (valor === null) return;
-    const pct = parseFloat(valor);
-    if (isNaN(pct) || pct < 0 || pct > 200) {
-      showToast("Valor inválido. Ingresa un número entre 0 y 200.", "error");
-      return;
-    }
-    showConfirm(
-      `¿Aplicar ${pct}% a TODOS los roles? Los costos por día se recalcularán automáticamente.`,
-      () => {
-        google.script.run
-          .withSuccessHandler(res => {
-            if (res && res.ok) {
-              showToast(`✓ ${res.count} roles actualizados al ${pct}%.`, "success");
-              bdCargar();
-            } else {
-              showToast("Error: " + (res && res.error ? res.error : "desconocido"), "error");
-            }
-          })
-          .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-          .actualizarPrestacionesPctMasivo(pct);
-      },
-      "Aplicar"
+      "54",
+      "number",
+      (valor) => {
+        if (valor === null || String(valor).trim() === "") return;
+        const pct = parseFloat(valor);
+        if (isNaN(pct) || pct < 0 || pct > 200) {
+          showToast("Valor inválido. Ingresa un número entre 0 y 200.", "error");
+          return;
+        }
+        showConfirm(
+          `¿Aplicar ${pct}% a TODOS los roles? Los costos por día se recalcularán automáticamente.`,
+          () => {
+            google.script.run
+              .withSuccessHandler(res => {
+                if (res && res.ok) {
+                  showToast(`✓ ${res.count} roles actualizados al ${pct}%.`, "success");
+                  bdCargar();
+                } else {
+                  showToast("Error: " + (res && res.error ? res.error : "desconocido"), "error");
+                }
+              })
+              .withFailureHandler(err => showToast("Error: " + err.message, "error"))
+              .actualizarPrestacionesPctMasivo(pct);
+          },
+          "Aplicar"
+        );
+      }
     );
   }
 

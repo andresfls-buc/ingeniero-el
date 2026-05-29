@@ -183,12 +183,6 @@ function _llenarHojaAPU(sheet, apu, ss) {
   const empresa = (cfg["empresa"] || "").trim();
   const logoId  = (cfg["logo_id"] || "").trim();
 
-  // Lookup de códigos de materiales (id → codigo)
-  const materialesCodigoById = {};
-  sheetToObjects(ss, "Materiales").forEach(m => {
-    materialesCodigoById[String(m.id)] = m.codigo || "";
-  });
-
   // Lookup de prestaciones por rol de MO (id → pct) para etiqueta real del encabezado
   const manoObraPrestById = {};
   sheetToObjects(ss, "ManoObra").forEach(m => {
@@ -336,7 +330,7 @@ function _llenarHojaAPU(sheet, apu, ss) {
       items.forEach((it, idx) => {
         const rend = (it.rendimiento !== null && it.rendimiento !== "") ? it.rendimiento : "—";
         const bg   = idx % 2 === 0 ? "#ffffff" : "#fafafa";
-        const codigo = resolverCodigoItem(it, materialesCodigoById);
+        const codigo = resolverCodigoItem(it);
         sheet.getRange(r, 1).setValue(codigo)
           .setFontSize(8).setHorizontalAlignment("center").setVerticalAlignment("middle");
         if (showUnidad) {
@@ -923,8 +917,7 @@ function _padId(id) {
 }
 
 // Devuelve el código a mostrar en la columna ÍTEM del APU.
-// MATERIAL → Materiales.codigo (lookup en mapa precargado). Si falta, fallback a MAT-<id>.
-// EQUIPO/MANO_OBRA/OTRO → autogenerado con prefijo + id zero-padded a 3.
+// MATERIAL/EQUIPO/MANO_OBRA/OTRO → autogenerado con prefijo + id zero-padded a 3.
 // Ítem sin recurso_id (descripción manual) → "—".
 // Construye el sufijo del encabezado de Mano de Obra mostrando el % real de prestaciones
 // según los roles utilizados en los ítems. Si los roles usan el mismo %, lo muestra;
@@ -943,15 +936,12 @@ function construirSufijoPrestaciones(moItems, manoObraPrestById) {
   return "(Prestaciones Sociales según rol)";
 }
 
-function resolverCodigoItem(item, materialesCodigoById) {
+function resolverCodigoItem(item) {
   if (!item) return "—";
   const id = item.recurso_id;
   if (id === "" || id === null || id === undefined) return "—";
   switch (item.tipo) {
-    case "MATERIAL": {
-      const codigo = materialesCodigoById ? materialesCodigoById[String(id)] : "";
-      return codigo || ("MAT-" + _padId(id));
-    }
+    case "MATERIAL":  return "MA-" + _padId(id);
     case "EQUIPO":    return "EQ-" + _padId(id);
     case "MANO_OBRA": return "MO-" + _padId(id);
     case "OTRO":      return "OT-" + _padId(id);

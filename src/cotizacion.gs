@@ -149,12 +149,7 @@ function llenarHojaCotizacion(sheet, cot) {
   const BORDE    = "#dddddd";
   const NC       = 6;
 
-  // Lookup de códigos de materiales (id → codigo) para la columna ÍTEM de los subitems
   const ssCot = SpreadsheetApp.getActiveSpreadsheet();
-  const materialesCodigoById = {};
-  sheetToObjects(ssCot, "Materiales").forEach(m => {
-    materialesCodigoById[String(m.id)] = m.codigo || "";
-  });
 
   // Lookup de prestaciones por rol de MO para etiqueta real del encabezado
   const manoObraPrestById = {};
@@ -304,7 +299,7 @@ function llenarHojaCotizacion(sheet, cot) {
         const bg = i % 2 === 0 ? "#ffffff" : "#fafafa";
         const cantTexto = it.cantidad != null ? it.cantidad : "";
         const mostrarUnidad = sec.key === "materiales";
-        sheet.getRange(r, 1).setValue(resolverCodigoItem(it, materialesCodigoById))
+        sheet.getRange(r, 1).setValue(resolverCodigoItem(it))
           .setFontSize(7).setFontColor("#666666")
           .setHorizontalAlignment("center").setVerticalAlignment("middle")
           .setBackground(bg)

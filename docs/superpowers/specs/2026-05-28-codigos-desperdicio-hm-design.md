@@ -17,6 +17,10 @@ Hoy el sistema no muestra códigos (columna ÍTEM es solo 1, 2, 3…), no tiene 
 
 ### 1. Códigos visibles — estrategia híbrida
 
+> ⚠️ **Superado (2026-05-29):** la decisión de mostrar el `codigo` real del
+> proveedor para MATERIAL fue revertida. Ahora los materiales también usan código
+> autogenerado `MA-<id>`. Ver `2026-05-29-materiales-codigo-ma-design.md`.
+
 | Tipo | Código mostrado | Fuente |
 |------|----------------|--------|
 | MATERIAL | `Materiales.codigo` (lookup por `recurso_id`) | BD existente (AA1, TC15, VAL-32-1A) |

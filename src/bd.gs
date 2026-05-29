@@ -87,6 +87,9 @@ function _bdConf(tipo) {
       campoValor: (col, id, d) => col === "id" ? id : (calcCampos(d)[col] ?? ""),
       campoValorUpdate: (col, _row, _h, d) => {
         if (col === "id") return undefined;
+        // El código ya no se edita desde el form (se muestra MA-<id> autogenerado).
+        // Si no viene en el payload, preservar el valor existente en la hoja.
+        if (col === "codigo" && d.codigo === undefined) return undefined;
         const m = calcCampos(d);
         return m[col] !== undefined ? m[col] : undefined;
       },
