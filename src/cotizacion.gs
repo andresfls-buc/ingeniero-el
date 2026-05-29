@@ -1032,3 +1032,39 @@ function recalcularCotizacion(ss, cotId) {
     }
   }
 }
+
+// ─── GET COTIZACIÓN CLIENTE (liviana, escala a 300+ ítems) ───────────────────
+// A diferencia de getCotizacionCompleta, NO carga APU_Items ni la BD de materiales.
+// El documento del cliente no muestra desglose, así que no se necesitan sub-ítems.
+function getCotizacionCliente(cotId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const cotSheet = ss.getSheetByName("Cotizaciones");
+  const cotData  = cotSheet.getDataRange().getValues();
+  const cotH     = cotData[0];
+  const cotRow   = cotData.slice(1).find(r => r[0] == cotId);
+  if (!cotRow) return null;
+
+  const cot = {};
+  cotH.forEach((h, i) => cot[h] = cotRow[i]);
+
+  // Normalizar % guardados como decimal (0.5 → 50)
+  ["administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct"].forEach(k => {
+    const v = parseFloat(cot[k]) || 0;
+    cot[k] = (v > 0 && v < 1) ? Math.round(v * 100) : v;
+  });
+
+  const itemsSheet = ss.getSheetByName("Cotizacion_Items");
+  const itemsData  = itemsSheet.getDataRange().getValues();
+  if (itemsData.length < 2) { cot.items = []; return cot; }
+
+  const ih = itemsData[0];
+  cot.items = itemsData.slice(1)
+    .filter(r => r[ih.indexOf("cotizacion_id")] == cotId)
+    .map(r => { const o = {}; ih.forEach((h, i) => o[h] = r[i]); return o; });
+
+  // Ordenar por número de ítem (orden numérico jerárquico)
+  cot.items.sort((a, b) => compararItemNum(a.item_num, b.item_num));
+
+  return cot;
+}
