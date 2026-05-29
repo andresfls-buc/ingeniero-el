@@ -1159,3 +1159,199 @@ function agregarVariasLineas(cotId, lineas) {
   recalcularCotizacion(ss, cotId);
   return { ok: true, count: filas.length };
 }
+
+// ─── RENDER DOCUMENTO DEL CLIENTE (tabla limpia, sin desglose) ───────────────
+// Diseñado para 300+ ítems: la tabla de ítems se escribe con UN solo setValues
+// y los formatos se aplican por rangos completos, no celda por celda.
+function llenarHojaCotizacionCliente(sheet, cot) {
+  const items   = (cot.items || []).slice().sort((a, b) => compararItemNum(a.item_num, b.item_num));
+  const valorNeto = parseFloat(cot.valor_neto) || 0;
+  const admPct  = parseFloat(cot.administracion_pct) || 0;
+  const impPct  = parseFloat(cot.imprevistos_pct)    || 0;
+  const utilPct = parseFloat(cot.utilidad_pct)       || 0;
+  const ivaPct  = parseFloat(cot.iva_pct)            || 0;
+
+  const cfg       = getConfig();
+  const empresa   = (cfg["empresa"]          || "").trim();
+  const remitente = (cfg["nombre_remitente"] || "").trim();
+  const logoId    = (cfg["logo_id"]          || "").trim();
+  const firmaId   = (cfg["firma_id"]         || "").trim();
+
+  const formaPago     = String(cot.forma_pago     || "").trim();
+  const plazoEntrega  = String(cot.plazo_entrega  || "").trim();
+  const validezOferta = String(cot.validez_oferta || "").trim();
+  const noIncluye     = String(cot.no_incluye     || "").trim();
+
+  const MONEY = '"$"#,##0';
+  const NEGRO = "#a8a8a8", GRIS_OSC = "#c8c8c8", BORDE = "#dddddd";
+  const NC = 6;
+
+  sheet.setColumnWidth(1, 55);
+  sheet.setColumnWidth(2, 300);
+  sheet.setColumnWidth(3, 55);
+  sheet.setColumnWidth(4, 60);
+  sheet.setColumnWidth(5, 120);
+  sheet.setColumnWidth(6, 130);
+
+  let r = 1;
+
+  // Encabezado: logo + empresa
+  sheet.setRowHeight(r, 55);
+  sheet.getRange(r, 1, 1, 2).merge().setValue("").setBackground("#ffffff");
+  sheet.getRange(r, 3, 1, 4).merge()
+    .setValue(empresa || "").setFontSize(16).setFontWeight("bold")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle").setBackground("#ffffff");
+  if (logoId) {
+    try { sheet.insertImage(DriveApp.getFileById(logoId).getBlob(), 1, r).setWidth(160).setHeight(48); } catch(e) {}
+  }
+  r++;
+
+  // Cliente + dirección
+  sheet.setRowHeight(r, 22);
+  sheet.getRange(r, 1, 1, 3).merge().setValue(cot.cliente ? "CLIENTE:    " + cot.cliente : "")
+    .setFontSize(9).setFontColor("#222222").setFontWeight("bold")
+    .setVerticalAlignment("middle").setWrap(true).setBackground("#f5f5f5");
+  sheet.getRange(r, 4, 1, 3).merge().setValue(cot.direccion ? "DIRECCIÓN:  " + cot.direccion : "")
+    .setFontSize(9).setFontColor("#333333").setVerticalAlignment("middle").setWrap(true).setBackground("#f5f5f5");
+  r++;
+
+  // N° oferta + fecha
+  sheet.setRowHeight(r, 14);
+  const infoOferta = [
+    cot.numero_oferta ? "N° Oferta: " + cot.numero_oferta : null,
+    cot.fecha         ? "Fecha: "     + cot.fecha         : null,
+  ].filter(Boolean).join("     ");
+  sheet.getRange(r, 1, 1, NC).merge().setValue(infoOferta)
+    .setFontSize(9).setFontColor("#555555").setHorizontalAlignment("right").setVerticalAlignment("middle");
+  r++;
+
+  // Encabezado de tabla
+  sheet.setRowHeight(r, 20);
+  sheet.getRange(r, 1, 1, NC)
+    .setValues([["ÍTEM", "DESCRIPCIÓN", "UND", "CANT.", "VR. UNITARIO", "VR. TOTAL"]])
+    .setBackground(NEGRO).setFontColor("#1a1a1a").setFontWeight("bold").setFontSize(9)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle")
+    .setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  r++;
+
+  // ── ÍTEMS: una sola escritura en bloque ──
+  const tablaInicio = r;
+  if (items.length) {
+    const matriz = items.map(it => {
+      const cant   = parseFloat(it.cantidad)   || 0;
+      const precio = parseFloat(it.precio_apu) || 0;
+      return [
+        it.item_num || "",
+        it.descripcion || "—",
+        it.unidad || "",
+        cant,
+        precio,
+        cant * precio,
+      ];
+    });
+    const rango = sheet.getRange(tablaInicio, 1, matriz.length, NC);
+    rango.setValues(matriz);
+    rango.setFontSize(9).setVerticalAlignment("middle")
+      .setBorder(true, true, true, true, true, true, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(tablaInicio, 1, matriz.length, 1).setHorizontalAlignment("center").setFontWeight("bold");
+    sheet.getRange(tablaInicio, 2, matriz.length, 1).setHorizontalAlignment("left").setWrap(true);
+    sheet.getRange(tablaInicio, 3, matriz.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(tablaInicio, 4, matriz.length, 1).setHorizontalAlignment("right");
+    sheet.getRange(tablaInicio, 5, matriz.length, 2).setHorizontalAlignment("right").setNumberFormat(MONEY);
+    sheet.getRange(tablaInicio, 6, matriz.length, 1).setFontWeight("bold");
+    r += matriz.length;
+  } else {
+    sheet.getRange(r, 1, 1, NC).merge().setValue("Sin ítems")
+      .setFontSize(9).setFontColor("#888888").setHorizontalAlignment("center");
+    r++;
+  }
+
+  // ── TOTALES (Subtotal + AIU + IVA + Total) ──
+  const admVal  = Math.round(valorNeto * admPct  / 100);
+  const impVal  = Math.round(valorNeto * impPct  / 100);
+  const utilVal = Math.round(valorNeto * utilPct / 100);
+  const sinIVA  = valorNeto + admVal + impVal + utilVal;
+  const ivaVal  = Math.round(sinIVA * ivaPct / 100);
+  const total   = sinIVA + ivaVal;
+
+  const filasTot = [["SUBTOTAL", valorNeto]];
+  if (admPct  > 0) filasTot.push(["ADMINISTRACIÓN (" + admPct  + "%)", admVal]);
+  if (impPct  > 0) filasTot.push(["IMPREVISTOS ("    + impPct  + "%)", impVal]);
+  if (utilPct > 0) filasTot.push(["UTILIDAD ("       + utilPct + "%)", utilVal]);
+  if (ivaPct  > 0) filasTot.push(["IVA ("            + ivaPct  + "%)", ivaVal]);
+
+  filasTot.forEach(([label, val]) => {
+    sheet.setRowHeight(r, 16);
+    sheet.getRange(r, 1, 1, 5).merge().setValue(label)
+      .setFontSize(9).setFontColor("#333333").setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBorder(true, true, true, null, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(r, 6).setValue(val).setNumberFormat(MONEY)
+      .setFontSize(9).setFontColor("#333333").setHorizontalAlignment("right").setVerticalAlignment("middle")
+      .setBorder(true, null, true, true, null, null, BORDE, SpreadsheetApp.BorderStyle.SOLID);
+    r++;
+  });
+
+  sheet.setRowHeight(r, 22);
+  sheet.getRange(r, 1, 1, 5).merge().setValue("VALOR TOTAL OFERTA")
+    .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
+    .setBorder(true, true, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sheet.getRange(r, 6).setValue(total).setNumberFormat(MONEY)
+    .setFontSize(12).setFontWeight("bold").setFontColor("#1a1a1a")
+    .setHorizontalAlignment("right").setVerticalAlignment("middle").setBackground(NEGRO)
+    .setBorder(true, null, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  r++;
+
+  // ── Condiciones comerciales ──
+  if (formaPago || plazoEntrega || validezOferta || noIncluye) {
+    r += 1;
+    sheet.setRowHeight(r, 18);
+    sheet.getRange(r, 1, 1, NC).merge().setValue("CONDICIONES COMERCIALES")
+      .setFontSize(10).setFontWeight("bold").setFontColor("#1a1a1a").setBackground(GRIS_OSC)
+      .setVerticalAlignment("middle");
+    r++;
+    [
+      formaPago     ? ["FORMA DE PAGO",        formaPago]     : null,
+      plazoEntrega  ? ["PLAZO DE ENTREGA",     plazoEntrega]  : null,
+      validezOferta ? ["VALIDEZ DE LA OFERTA", validezOferta] : null,
+    ].filter(Boolean).forEach(([label, val]) => {
+      sheet.setRowHeight(r, 20);
+      sheet.getRange(r, 1, 1, 2).merge().setValue(label)
+        .setFontSize(9).setFontWeight("bold").setFontColor("#333333").setBackground("#f5f5f5").setVerticalAlignment("middle");
+      sheet.getRange(r, 3, 1, 4).merge().setValue(val)
+        .setFontSize(9).setFontColor("#333333").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("middle");
+      r++;
+    });
+    if (noIncluye) {
+      r++;
+      sheet.getRange(r, 1, 1, NC).merge().setValue("NUESTRA OFERTA NO INCLUYE:")
+        .setFontSize(9).setFontWeight("bold").setFontColor("#333333");
+      r++;
+      sheet.setRowHeight(r, 60);
+      sheet.getRange(r, 1, 1, NC).merge().setValue(noIncluye)
+        .setFontSize(9).setFontColor("#555555").setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP).setVerticalAlignment("top");
+      r++;
+    }
+  }
+
+  // ── Firma ──
+  r += 1;
+  if (firmaId) {
+    try {
+      sheet.setRowHeight(r, 65);
+      sheet.insertImage(DriveApp.getFileById(firmaId).getBlob(), 1, r).setWidth(200).setHeight(58);
+    } catch(e) {}
+    r++;
+  }
+  sheet.setRowHeight(r, 4);
+  sheet.getRange(r, 1, 1, 3).merge()
+    .setBorder(false, false, true, false, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  r++;
+  const firmaLinea = [remitente, empresa].filter(Boolean).join("\n");
+  if (firmaLinea) {
+    sheet.setRowHeight(r, remitente && empresa ? 36 : 20);
+    sheet.getRange(r, 1, 1, NC).merge().setValue(firmaLinea)
+      .setFontSize(9).setFontWeight("bold").setVerticalAlignment("top")
+      .setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP);
+  }
+}
