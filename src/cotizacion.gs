@@ -1103,3 +1103,59 @@ function actualizarItemCotizacion(itemId, cambios) {
   }
   return { ok: false };
 }
+
+// ─── AGREGAR LÍNEA MANUAL (sin APU) ──────────────────────────────────────────
+function agregarLineaManual(cotId, datos) {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet  = ss.getSheetByName("Cotizacion_Items");
+  const data   = sheet.getDataRange().getValues();
+  const lastId = data.length > 1
+    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+    : 0;
+  const newId  = lastId + 1;
+
+  const cant   = parseFloat(datos.cantidad)   || 0;
+  const precio = parseFloat(datos.precio_apu) || 0;
+
+  // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion, unidad, cantidad, precio_apu, valor_total
+  sheet.appendRow([
+    newId, cotId, "",
+    datos.item_num    || "",
+    datos.descripcion || "",
+    datos.unidad      || "",
+    cant, precio, cant * precio
+  ]);
+
+  recalcularCotizacion(ss, cotId);
+  return { id: newId, valor_total: cant * precio };
+}
+
+// ─── AGREGAR VARIAS LÍNEAS DE UN GOLPE (escala a 300+ ítems) ─────────────────
+// lineas: [{ item_num, descripcion, unidad, cantidad, precio_apu }, ...]
+// Una sola escritura a la hoja + un solo recálculo.
+function agregarVariasLineas(cotId, lineas) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Cotizacion_Items");
+  const data  = sheet.getDataRange().getValues();
+  let nextId  = (data.length > 1
+    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+    : 0) + 1;
+
+  const filas = (lineas || []).map(l => {
+    const cant   = parseFloat(l.cantidad)   || 0;
+    const precio = parseFloat(l.precio_apu) || 0;
+    return [
+      nextId++, cotId, "",
+      l.item_num    || "",
+      l.descripcion || "",
+      l.unidad      || "",
+      cant, precio, cant * precio
+    ];
+  });
+  if (!filas.length) return { ok: true, count: 0 };
+
+  const startRow = sheet.getLastRow() + 1;
+  sheet.getRange(startRow, 1, filas.length, filas[0].length).setValues(filas);
+  recalcularCotizacion(ss, cotId);
+  return { ok: true, count: filas.length };
+}
