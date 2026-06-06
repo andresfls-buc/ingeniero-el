@@ -774,7 +774,8 @@
     <h1>Sistema APU</h1>
     <div class="tab-group">
       <button class="tab-btn active" id="tab-apus" onclick="irTabAPUs()">APUs</button>
-      <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Cotizaciones</button>
+      <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Internas</button>
+      <button class="tab-btn" id="tab-cots-cli" onclick="irTabCotsCliente()">Clientes</button>
       <button class="tab-btn" id="tab-archivos" onclick="irTabArchivos()">Mis Archivos</button>
     </div>
     <button class="btn btn-back" onclick="abrirGestionarBD()" style="border-color:rgba(255,255,255,0.5)">⚙ BD de Precios</button>
@@ -2024,6 +2025,7 @@
     tabActual = "apus";
     document.getElementById("tab-apus").classList.add("active");
     document.getElementById("tab-cots").classList.remove("active");
+    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nuevo APU";
     document.getElementById("btn-nuevo").style.display = "";
@@ -2038,6 +2040,7 @@
     tabActual = "cots";
     document.getElementById("tab-cots").classList.add("active");
     document.getElementById("tab-apus").classList.remove("active");
+    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
     document.getElementById("btn-nuevo").style.display = "";
@@ -2046,6 +2049,53 @@
     document.getElementById("v-cot-cliente").style.display = "none";
     document.getElementById("v-lista").style.display       = "";
     cargarCotizaciones();
+  }
+
+  function irTabCotsCliente() {
+    tabActual = "cots-cli";
+    document.getElementById("tab-cots-cli").classList.add("active");
+    document.getElementById("tab-apus").classList.remove("active");
+    document.getElementById("tab-cots").classList.remove("active");
+    document.getElementById("tab-archivos").classList.remove("active");
+    document.getElementById("btn-nuevo").style.display     = "none";
+    document.getElementById("v-apu").style.display         = "none";
+    document.getElementById("v-cot").style.display         = "none";
+    document.getElementById("v-cot-cliente").style.display = "none";
+    document.getElementById("v-lista").style.display       = "";
+    cargarCotizacionesCliente();
+  }
+
+  function cargarCotizacionesCliente() {
+    const el = document.getElementById("lista-container");
+    el.innerHTML = '<div class="loading">Cargando...</div>';
+    google.script.run
+      .withSuccessHandler(renderCotizacionesCliente)
+      .withFailureHandler(err => el.innerHTML = "Error: " + err.message)
+      .listarCotizaciones();
+  }
+
+  function renderCotizacionesCliente(cots) {
+    const el = document.getElementById("lista-container");
+    if (!cots || cots.length === 0) {
+      el.innerHTML = '<p class="empty">No hay cotizaciones. Créalas primero en la pestaña Internas.</p>';
+      return;
+    }
+    el.innerHTML = `<table class="list-table">
+      <thead><tr>
+        <th>N° OFERTA</th><th>CLIENTE</th><th>FECHA</th>
+        <th class="num">VALOR TOTAL</th><th>ESTADO</th><th></th>
+      </tr></thead>
+      <tbody>${cots.map(c => `<tr>
+        <td class="mono">${c.numero_oferta || '—'}</td>
+        <td>${c.cliente || '—'}</td>
+        <td>${c.fecha || '—'}</td>
+        <td class="num">${COP(c.valor_total)}</td>
+        <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
+        <td>
+          <button class="btn-open" style="border-color:#2e7d32;color:#2e7d32" onclick="abrirDocCliente(${c.id})">Abrir →</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
   }
 
   function cargarCotizaciones() {
@@ -2076,7 +2126,6 @@
         <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
         <td style="display:flex;gap:6px">
           <button class="btn-open" onclick="abrirCotizacion(${c.id})">Abrir →</button>
-          <button class="btn-open" style="border-color:#2e7d32;color:#2e7d32" onclick="abrirDocCliente(${c.id})">📄 Cliente</button>
           <button class="btn-del" title="Eliminar cotización" onclick="confirmarEliminarCot(${c.id}, '${(c.numero_oferta || '').replace(/'/g,"\\'")}')">✕</button>
         </td>
       </tr>`).join('')}</tbody>
@@ -2706,6 +2755,7 @@ function agregarLineaManualUI() {
     document.getElementById("tab-archivos").classList.add("active");
     document.getElementById("tab-apus").classList.remove("active");
     document.getElementById("tab-cots").classList.remove("active");
+    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("btn-nuevo").style.display = "none";
     document.getElementById("v-apu").style.display  = "none";
     document.getElementById("v-cot").style.display  = "none";
@@ -3137,7 +3187,7 @@ function agregarLineaManualUI() {
 ════════════════════════════════════════════════ -->
 <div id="v-cot-cliente" style="display:none">
   <div class="toolbar">
-    <button class="btn btn-back" onclick="irTabCots()">← Volver</button>
+    <button class="btn btn-back" onclick="irTabCotsCliente()">← Volver</button>
     <h2 id="cli-titulo">Documento Cliente</h2>
     <div style="margin-left:auto;display:flex;gap:8px">
       <button class="btn-action btn-azul" id="btn-imprimir-cli" onclick="window.print()" style="font-size:12px;padding:7px 16px">🖨 Imprimir / PDF</button>
