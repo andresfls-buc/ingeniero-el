@@ -96,7 +96,7 @@ function listarArchivosDrive() {
   const resultado = [];
   const carpetas = [
     { key: "carpeta_apus",         tipo: "APU" },
-    { key: "carpeta_cotizaciones", tipo: "COT" },
+    { key: "carpeta_cotizaciones_internas", tipo: "COT" },
   ];
   carpetas.forEach(({ key, tipo }) => {
     const id = (cfg[key] || "").trim();

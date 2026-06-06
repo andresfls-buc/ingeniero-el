@@ -251,7 +251,7 @@ function setupDatabase() {
   // === CONFIGURACIÓN ===
   createSheet(ss, "Configuracion", ["clave", "valor", "descripcion"]);
   const cfg = ss.getSheetByName("Configuracion");
-  cfg.appendRow(["carpeta_cotizaciones", "", "ID de la carpeta de Drive donde se guardan los PDFs de cotizaciones"]);
+  cfg.appendRow(["carpeta_cotizaciones_internas", "", "ID de la carpeta de Drive para cotizaciones internas"]);
   cfg.appendRow(["carpeta_apus",         "", "ID de la carpeta de Drive donde se guardarán los PDFs de APUs"]);
   cfg.appendRow(["nombre_remitente",     "", "Tu nombre completo (aparece como remitente del correo)"]);
   cfg.appendRow(["empresa",              "", "Nombre de tu empresa o razón social"]);

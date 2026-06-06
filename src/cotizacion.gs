@@ -107,9 +107,9 @@ function exportarCotizacionPDF(cotId, tipo) {
 }
 
 function obtenerCarpetaPDF() {
-  const FOLDER_ID = (getConfig()["carpeta_cotizaciones"] || "").trim();
+  const FOLDER_ID = (getConfig()["carpeta_cotizaciones_internas"] || "").trim();
   if (!FOLDER_ID) throw new Error(
-    "Configura el ID de tu carpeta de Drive en la hoja 'Configuracion' → fila 'carpeta_cotizaciones'. " +
+    "Configura el ID de tu carpeta de Drive en la hoja 'Configuracion' → fila 'carpeta_cotizaciones_internas'. " +
     "Abre la carpeta en Drive, copia el ID del final de la URL y pégalo ahí."
   );
   const raiz = DriveApp.getFolderById(FOLDER_ID);
