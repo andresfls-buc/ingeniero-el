@@ -1587,6 +1587,7 @@
                 tabActual = "cots";
                 document.getElementById("tab-cots").classList.add("active");
                 document.getElementById("tab-apus").classList.remove("active");
+                document.getElementById("tab-cots-cli").classList.remove("active");
                 document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
                 document.getElementById("v-apu").style.display  = "none";
                 document.getElementById("v-lista").style.display = "none";
@@ -2136,6 +2137,11 @@
     cotActual = null;
     cotItems  = {};
     limpiarFormCot();
+    // Pre-fill desde el APU activo si hay uno abierto
+    if (apuActual) {
+      document.getElementById("cot-cliente").value   = document.getElementById("f-cliente").value   || "";
+      document.getElementById("cot-direccion").value = document.getElementById("f-direccion").value || "";
+    }
     document.getElementById("v-lista").style.display = "none";
     document.getElementById("v-cot").style.display   = "";
     document.getElementById("cot-titulo").textContent = "Nueva Cotización";
@@ -3279,10 +3285,16 @@ function abrirDocCliente(cotId) {
   document.getElementById("v-cot").style.display         = "none";
   document.getElementById("v-cot-cliente").style.display = "";
   document.getElementById("cli-tbody").innerHTML         = '<tr><td colspan="7" style="padding:14px;color:#999;text-align:center">Cargando...</td></tr>';
+  // Si el doc cliente está vacío, auto-poblar desde APUs de la cotización interna
   google.script.run
-    .withSuccessHandler(renderDocCliente)
+    .withSuccessHandler(() => {
+      google.script.run
+        .withSuccessHandler(renderDocCliente)
+        .withFailureHandler(err => showToast("Error: " + err.message, "error"))
+        .getCotizacionClienteDoc(cotId);
+    })
     .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-    .getCotizacionClienteDoc(cotId);
+    .inicializarClienteDesdeAPUs(cotId);
 }
 
 function renderDocCliente(doc) {

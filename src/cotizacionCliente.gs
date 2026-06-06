@@ -55,6 +55,64 @@ function agregarFilaClienteDoc(cotId) {
   return { id: newId, valor_total: 0 };
 }
 
+// Puebla Cotizacion_Cliente_Items desde los APUs de la cotización interna (solo si está vacío).
+// Para cada ítem interno con apu_id, crea una fila con: actividad→descripcion, unidad, costo_neto→precio_unitario.
+function inicializarClienteDesdeAPUs(cotId) {
+  const ss      = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet   = _clienteSheet();
+  const data    = sheet.getDataRange().getValues();
+  const h       = data[0];
+
+  // Solo inicializar si no hay filas para este cotId
+  const yaExisten = data.length > 1 &&
+    data.slice(1).some(r => r[h.indexOf("cotizacion_id")] == cotId);
+  if (yaExisten) return { ok: true, initialized: false, items: [] };
+
+  // Leer ítems internos de la cotización
+  const cotItemsData = ss.getSheetByName("Cotizacion_Items").getDataRange().getValues();
+  const cih          = cotItemsData[0];
+  const internos     = cotItemsData.slice(1)
+    .filter(r => r[cih.indexOf("cotizacion_id")] == cotId && r[cih.indexOf("apu_id")]);
+
+  if (internos.length === 0) return { ok: true, initialized: false, items: [] };
+
+  // Leer APUs para obtener actividad, unidad, costo_neto
+  const apuData = ss.getSheetByName("APU").getDataRange().getValues();
+  const ah      = apuData[0];
+  const apuById = {};
+  apuData.slice(1).forEach(r => {
+    apuById[String(r[ah.indexOf("id")])] = r;
+  });
+
+  // Calcular el último id existente en Cotizacion_Cliente_Items
+  const allData = sheet.getDataRange().getValues();
+  const lastId  = allData.length > 1
+    ? Math.max(...allData.slice(1).map(r => parseInt(r[0]) || 0))
+    : 0;
+
+  let nextId  = lastId + 1;
+  const created = [];
+
+  internos.forEach(interno => {
+    const apuId  = String(interno[cih.indexOf("apu_id")]);
+    const apuRow = apuById[apuId];
+    if (!apuRow) return;
+
+    const itemNum   = interno[cih.indexOf("item_num")]  || "";
+    const cantidad  = parseFloat(interno[cih.indexOf("cantidad")]) || 1;
+    const desc      = apuRow[ah.indexOf("actividad")]   || apuRow[ah.indexOf("descripcion")] || "";
+    const unidad    = apuRow[ah.indexOf("unidad")]      || "";
+    const precio    = Math.round(parseFloat(apuRow[ah.indexOf("costo_neto")]) || 0);
+    const total     = Math.round(cantidad * precio);
+
+    sheet.appendRow([nextId, cotId, itemNum, desc, unidad, cantidad, precio, total]);
+    created.push({ id: nextId, item_num: itemNum, descripcion: desc, unidad, cantidad, precio_unitario: precio, valor_total: total });
+    nextId++;
+  });
+
+  return { ok: true, initialized: true, items: created };
+}
+
 // Actualiza campos de una fila. Recalcula valor_total.
 function actualizarFilaClienteDoc(itemId, cambios) {
   const sheet = _clienteSheet();
