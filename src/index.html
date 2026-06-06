@@ -2257,11 +2257,11 @@
     const utilPct = parseFloat(document.getElementById("cot-util-pct").value) || 0;
     const ivaPct  = parseFloat(document.getElementById("cot-iva-pct").value)  || 0;
 
-    const admVal  = neto * admPct  / 100;
-    const impVal  = neto * impPct  / 100;
-    const utilVal = neto * utilPct / 100;
+    const admVal  = Math.round(neto * admPct  / 100);
+    const impVal  = Math.round(neto * impPct  / 100);
+    const utilVal = Math.round(neto * utilPct / 100);
     const sinIVA  = neto + admVal + impVal + utilVal;
-    const ivaVal  = sinIVA * ivaPct / 100;
+    const ivaVal  = Math.round(sinIVA * ivaPct / 100);
     const total   = sinIVA + ivaVal;
 
     document.getElementById("cot-subtotal").textContent = COP(neto);
@@ -3298,7 +3298,7 @@ function renderFilaCliente(item) {
   tr.style.borderBottom = "1px solid #eee";
   tr.innerHTML = `
     <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${item.item_num || ''}" placeholder="1.1"
+      <input type="text" class="cell-input" value="${(item.item_num||'').replace(/"/g,'&quot;')}" placeholder="1.1"
         style="width:44px;text-align:center;font-weight:700;color:#1a237e"
         onchange="guardarCampoCliente(${id},'item_num',this.value)"></td>
     <td style="padding:5px 6px">
@@ -3306,7 +3306,7 @@ function renderFilaCliente(item) {
         style="width:100%"
         onchange="guardarCampoCliente(${id},'descripcion',this.value)"></td>
     <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${item.unidad||''}" placeholder="und"
+      <input type="text" class="cell-input" value="${(item.unidad||'').replace(/"/g,'&quot;')}" placeholder="und"
         style="width:44px;text-align:center"
         onchange="guardarCampoCliente(${id},'unidad',this.value)"></td>
     <td style="padding:5px 6px">
