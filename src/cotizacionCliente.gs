@@ -3,7 +3,9 @@
 // Columnas: id, cotizacion_id, item_num, descripcion, unidad, cantidad, precio_unitario, valor_total
 
 function _clienteSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Cotizacion_Cliente_Items");
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Cotizacion_Cliente_Items");
+  if (!sheet) throw new Error("Hoja Cotizacion_Cliente_Items no encontrada. Ejecuta migrarHojaClienteItems() primero.");
+  return sheet;
 }
 
 // Devuelve { cot: {...}, items: [...], cfg: {...} }
@@ -32,16 +34,7 @@ function getCotizacionClienteDoc(cotId) {
     items = data.slice(1)
       .filter(r => r[h.indexOf("cotizacion_id")] == cotId)
       .map(r => { const o = {}; h.forEach((k, i) => o[k] = r[i]); return o; });
-    items.sort((a, b) => {
-      // Orden numérico jerárquico: "1" < "1.1" < "1.2" < "2"
-      const partsA = String(a.item_num || "").split(".").map(Number);
-      const partsB = String(b.item_num || "").split(".").map(Number);
-      for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-        const diff = (partsA[i] || 0) - (partsB[i] || 0);
-        if (diff !== 0) return diff;
-      }
-      return 0;
-    });
+    items.sort((a, b) => compararItemNum(a.item_num, b.item_num));
   }
 
   // Config de empresa (para header del documento)
@@ -78,9 +71,9 @@ function actualizarFilaClienteDoc(itemId, cambios) {
       const precio = parseFloat(cambios.precio_unitario ?? row[h.indexOf("precio_unitario")]) || 0;
       row[h.indexOf("cantidad")]        = cant;
       row[h.indexOf("precio_unitario")] = precio;
-      row[h.indexOf("valor_total")]     = cant * precio;
+      row[h.indexOf("valor_total")]     = Math.round(cant * precio);
       sheet.getRange(i + 1, 1, 1, h.length).setValues([row]);
-      return { ok: true, valor_total: cant * precio };
+      return { ok: true, valor_total: Math.round(cant * precio) };
     }
   }
   return { ok: false };
