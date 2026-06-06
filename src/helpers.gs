@@ -26,3 +26,27 @@ function getConfig() {
   });
   return cfg;
 }
+
+// Escribe un objeto { clave: valor } en la hoja Configuracion.
+// Si la clave ya existe la actualiza; si no existe la agrega al final.
+function guardarConfiguracion(datos) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Configuracion");
+  if (!sheet) return { ok: false, error: "Hoja Configuracion no encontrada" };
+
+  const lastRow = sheet.getLastRow();
+  const claves  = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(r => String(r[0]).trim())
+    : [];
+
+  Object.entries(datos).forEach(([clave, valor]) => {
+    const idx = claves.indexOf(clave);
+    if (idx >= 0) {
+      sheet.getRange(idx + 2, 2).setValue(valor);
+    } else {
+      sheet.appendRow([clave, valor, ""]);
+      claves.push(clave);
+    }
+  });
+  return { ok: true };
+}

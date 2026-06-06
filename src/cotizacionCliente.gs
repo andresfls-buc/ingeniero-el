@@ -3,44 +3,70 @@
 // Columnas: id, cotizacion_id, item_num, descripcion, unidad, cantidad, precio_unitario, valor_total
 
 function _clienteSheet() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Cotizacion_Cliente_Items");
-  if (!sheet) throw new Error("Hoja Cotizacion_Cliente_Items no encontrada. Ejecuta migrarHojaClienteItems() primero.");
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Cotizacion_Cliente_Items");
+  // Auto-crear la hoja si no existe — sin migración manual ni alertas de UI,
+  // para que la página de Cotizaciones Clientes funcione de inmediato.
+  if (!sheet) {
+    sheet = ss.insertSheet("Cotizacion_Cliente_Items");
+    sheet.appendRow(["id", "cotizacion_id", "item_num", "descripcion", "unidad", "cantidad", "precio_unitario", "valor_total"]);
+    sheet.setFrozenRows(1);
+  }
   return sheet;
 }
 
 // Devuelve { cot: {...}, items: [...], cfg: {...} }
 function getCotizacionClienteDoc(cotId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // DIAG: devolvemos SIEMPRE un string JSON. Un string nunca falla la
+  // serialización de google.script.run, así vemos el contenido crudo real.
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Cabecera de la cotización (cliente, fecha, numero_oferta, AIU, condiciones)
-  const cotSheet = ss.getSheetByName("Cotizaciones");
-  const cotData  = cotSheet.getDataRange().getValues();
-  const cotH     = cotData[0];
-  const cotRow   = cotData.slice(1).find(r => r[0] == cotId);
-  if (!cotRow) return null;
-  const cot = {};
-  cotH.forEach((h, i) => cot[h] = cotRow[i]);
-  ["administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct"].forEach(k => {
-    const v = parseFloat(cot[k]) || 0;
-    cot[k] = (v > 0 && v < 1) ? Math.round(v * 100) : v;
-  });
+    // Cabecera de la cotización (cliente, fecha, numero_oferta, AIU, condiciones)
+    const cotSheet = ss.getSheetByName("Cotizaciones");
+    const cotData  = cotSheet.getDataRange().getValues();
+    const cotH     = cotData[0];
+    const cotRow   = cotData.slice(1).find(r => r[0] == cotId);
+    if (!cotRow) {
+      return JSON.stringify({
+        __diag: true,
+        encontrada: false,
+        cotIdRecibido: cotId,
+        tipoCotId: typeof cotId,
+        spreadsheetId: ss.getId(),
+        spreadsheetNombre: ss.getName(),
+        sheetCotizaciones: cotSheet ? cotSheet.getName() : "NO EXISTE",
+        totalFilas: cotData.length - 1,
+        idsEnHoja: cotData.slice(1).map(r => r[0]),
+        headers: cotH,
+      });
+    }
+    const cot = {};
+    cotH.forEach((h, i) => cot[h] = cotRow[i]);
+    ["administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct"].forEach(k => {
+      const v = parseFloat(cot[k]) || 0;
+      cot[k] = (v > 0 && v < 1) ? Math.round(v * 100) : v;
+    });
 
-  // Ítems del documento cliente
-  const sheet = _clienteSheet();
-  const data  = sheet.getDataRange().getValues();
-  let items = [];
-  if (data.length > 1) {
-    const h = data[0];
-    items = data.slice(1)
-      .filter(r => r[h.indexOf("cotizacion_id")] == cotId)
-      .map(r => { const o = {}; h.forEach((k, i) => o[k] = r[i]); return o; });
-    items.sort((a, b) => compararItemNum(a.item_num, b.item_num));
+    // Ítems del documento cliente
+    const sheet = _clienteSheet();
+    const data  = sheet.getDataRange().getValues();
+    let items = [];
+    if (data.length > 1) {
+      const h = data[0];
+      items = data.slice(1)
+        .filter(r => r[h.indexOf("cotizacion_id")] == cotId)
+        .map(r => { const o = {}; h.forEach((k, i) => o[k] = r[i]); return o; });
+      items.sort((a, b) => compararItemNum(a.item_num, b.item_num));
+    }
+
+    // Config de empresa (para header del documento)
+    const cfg = getConfig();
+
+    return JSON.stringify({ encontrada: true, cot, items, cfg });
+  } catch (e) {
+    return JSON.stringify({ __diag: true, error: String(e && e.message || e), stack: String(e && e.stack || "") });
   }
-
-  // Config de empresa (para header del documento)
-  const cfg = getConfig();
-
-  return { cot, items, cfg };
 }
 
 // Agrega una fila vacía. Devuelve { id, valor_total: 0 }

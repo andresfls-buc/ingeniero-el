@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(find /Users/andreslandazabal/ingeniero-el -name \"*.xlsx\" -o -name \"*.xls\" 2>/dev/null; find /Users/andreslandazabal -maxdepth 3 -name \"*.xlsx\" 2>/dev/null)",
-      "Read(//Users/andreslandazabal/**)"
+      "Read(//Users/andreslandazabal/**)",
+      "Bash(npm test *)",
+      "Bash(git *)"
     ]
   }
 }

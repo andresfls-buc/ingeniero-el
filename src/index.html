@@ -766,6 +766,9 @@
 </head>
 <body>
 
+<!-- Etiqueta de versión: si NO ves este texto en la app, el navegador está cargando código viejo (deployment sin actualizar). -->
+<div style="position:fixed;bottom:6px;left:6px;z-index:9999;background:#1a237e;color:#fff;font:11px/1.4 monospace;padding:3px 8px;border-radius:4px;opacity:.85" class="no-print">BUILD 2026-06-06-D</div>
+
 <!-- ═══════════════════════════════════════════════
      VISTA: LISTA DE APUs
 ════════════════════════════════════════════════ -->
@@ -1022,7 +1025,6 @@
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>CUADRO DE COTIZACIÓN</span>
         <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
-      <button class="btn-add" onclick="agregarLineaManualUI()">+ Agregar fila</button>
       </div>
       <table class="apu-table">
         <thead>
@@ -1141,8 +1143,8 @@
     </div>
 
     <div class="actions-bar">
-      <button class="btn-action btn-naranja" id="btn-pdf" onclick="descargarPDF('cliente')">
-        ⬇ Cotización para el cliente (.xlsx)
+      <button class="btn-action btn-naranja" id="btn-ir-cliente" onclick="irADocCliente()">
+        → Pasar a Cotización Cliente
       </button>
       <button class="btn-action" id="btn-pdf-interna" onclick="descargarPDF('interna')" style="background:#607d8b;color:#fff">
         ⬇ Cotización interna / auditoría (.xlsx)
@@ -1386,7 +1388,7 @@
         <td>${a.fecha || '—'}</td>
         <td style="display:flex;gap:6px">
           <button class="btn-open" onclick="abrirAPU(${a.id})">Abrir →</button>
-          <button class="btn-del" title="Eliminar APU" onclick="confirmarEliminarAPU(${a.id}, '${(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button>
+          <button class="btn-del" title="Eliminar APU" onclick="confirmarEliminarAPU(${a.id}, '${String(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button>
         </td>
       </tr>`).join('')}</tbody>
     </table>`;
@@ -2145,7 +2147,7 @@
         <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
         <td style="display:flex;gap:6px">
           <button class="btn-open" onclick="abrirCotizacion(${c.id})">Abrir →</button>
-          <button class="btn-del" title="Eliminar cotización" onclick="confirmarEliminarCot(${c.id}, '${(c.numero_oferta || '').replace(/'/g,"\\'")}')">✕</button>
+          <button class="btn-del" title="Eliminar cotización" onclick="confirmarEliminarCot(${c.id}, '${String(c.numero_oferta || '').replace(/'/g,"\\'")}')">✕</button>
         </td>
       </tr>`).join('')}</tbody>
     </table>`;
@@ -2242,6 +2244,43 @@
     }
   }
 
+  // Pasar de la cotización interna al documento del cliente, llevando los datos del APU.
+  function irADocCliente() {
+    if (!cotActual || !cotActual.id) {
+      showToast("Agrega al menos un APU antes de pasar a la cotización del cliente.", "warning");
+      return;
+    }
+    // Persistir el encabezado (cliente, dirección, AIU, condiciones) antes de abrir el doc del cliente,
+    // así el documento del cliente refleja lo último que escribiste.
+    const datos = {
+      cliente:            document.getElementById("cot-cliente").value,
+      direccion:          document.getElementById("cot-direccion").value,
+      forma_pago:         document.getElementById("cot-forma-pago").value,
+      plazo_entrega:      document.getElementById("cot-plazo-entrega").value,
+      validez_oferta:     document.getElementById("cot-validez-oferta").value,
+      no_incluye:         document.getElementById("cot-no-incluye").value,
+      administracion_pct: parseFloat(document.getElementById("cot-adm-pct").value)  || 0,
+      imprevistos_pct:    parseFloat(document.getElementById("cot-imp-pct").value)  || 0,
+      utilidad_pct:       parseFloat(document.getElementById("cot-util-pct").value) || 0,
+      iva_pct:            parseFloat(document.getElementById("cot-iva-pct").value)  || 0,
+    };
+    setCotEstado("Guardando...");
+    console.log("DIAG irADocCliente: cotActual.id =", cotActual.id, "tipo =", typeof cotActual.id);
+    google.script.run
+      .withSuccessHandler((res) => {
+        console.log("DIAG actualizarCotizacion devolvió:", JSON.stringify(res), "(ok:false = id no encontrado en la hoja)");
+        tabActual = "cots-cli";
+        document.getElementById("tab-cots-cli").classList.add("active");
+        document.getElementById("tab-cots").classList.remove("active");
+        document.getElementById("tab-apus").classList.remove("active");
+        document.getElementById("tab-archivos").classList.remove("active");
+        document.getElementById("btn-nuevo").style.display = "none";
+        abrirDocCliente(cotActual.id);
+      })
+      .withFailureHandler(err => showToast("Error guardando: " + err.message, "error"))
+      .actualizarCotizacion(cotActual.id, datos);
+  }
+
   // Fila en el cuadro de cotización (con sub-ítems inline)
   function renderFilaCot(item, itemNum) {
     const tbody  = document.getElementById("body-cuadro");
@@ -2256,7 +2295,7 @@
         <input type="text" class="cell-input" value="${item.item_num != null ? item.item_num : ''}" placeholder="1.1" style="width:48px;text-align:center;font-weight:700;color:#1a237e"
           onchange="cambiarItemNumCot('${id}', this.value)"></td>
       <td colspan="2">
-        <input type="text" class="cell-input" value="${(item.descripcion || '').replace(/"/g,'&quot;')}" placeholder="Descripción..." style="width:100%;font-weight:600"
+        <input type="text" class="cell-input" value="${String(item.descripcion || '').replace(/"/g,'&quot;')}" placeholder="Descripción..." style="width:100%;font-weight:600"
           onchange="cambiarDescripcionCot('${id}', this.value)"></td>
       <td style="text-align:center">${item.unidad || "—"}</td>
       <td><input type="number" class="cell-input" value="${cant}" min="1" style="width:68px"
@@ -2496,7 +2535,7 @@ function agregarLineaManualUI() {
       <td>${a.actividad || '—'}</td>
       <td class="num">${COP(a.costo_neto)}</td>
       <td><button class="btn-sel" onclick="seleccionarAPU(${a.id})">Agregar</button></td>
-      <td><button class="btn-del" title="Eliminar APU" onclick="eliminarAPUDesdeModal(${a.id}, '${(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button></td>
+      <td><button class="btn-del" title="Eliminar APU" onclick="eliminarAPUDesdeModal(${a.id}, '${String(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button></td>
     </tr>`).join("");
   }
 
@@ -2533,22 +2572,16 @@ function agregarLineaManualUI() {
       };
       renderFilaCot(item, itemNum);
 
-      const esElPrimero = Object.keys(cotItems).length === 1;
       google.script.run
         .withSuccessHandler(res => {
           reemplazarTempIdCot(tempId, res.id);
-          google.script.run
-            .withSuccessHandler(apuCompleto => insertarSubitemsFilaCot(res.id, apuCompleto))
-            .getAPUCompleto(apuId);
-          if (esElPrimero) {
-            const cliente   = apu.cliente   || "";
-            const direccion = apu.direccion || "";
-            if (cliente)   document.getElementById("cot-cliente").value   = cliente;
-            if (direccion) document.getElementById("cot-direccion").value = direccion;
-            if (cliente || direccion) {
-              google.script.run.actualizarCotizacion(cotActual.id, { cliente, direccion });
-            }
-          }
+          // Sub-ítems del APU vienen en la misma respuesta (una sola llamada).
+          if (res.apu) insertarSubitemsFilaCot(res.id, res.apu);
+          // Cliente / dirección heredados del APU por el servidor (si estaban vacíos).
+          const cli = document.getElementById("cot-cliente");
+          const dir = document.getElementById("cot-direccion");
+          if (res.cliente   && !cli.value.trim()) cli.value = res.cliente;
+          if (res.direccion && !dir.value.trim()) dir.value = res.direccion;
         })
         .withFailureHandler(err => showToast("Error: " + err.message, "error"))
         .agregarAPUaCotizacion(cotActual.id, apuId, cant);
@@ -2956,7 +2989,7 @@ function agregarLineaManualUI() {
     tbody.innerHTML = items.map(item => {
       const id     = item.id;
       const nombre = (bdTabActual === "MO" ? item.descripcion : item.nombre) || "";
-      const esc    = nombre.replace(/'/g, "\\'");
+      const esc    = String(nombre).replace(/'/g, "\\'");
       const tipo   = { MAT: "MATERIAL", MO: "MANO_OBRA", EQ: "EQUIPO" }[bdTabActual];
       const acciones = `
         <td class="center"><button class="bd-row-action bd-row-edit" onclick="mostrarFormBD(${id})" title="Editar">✏ Editar</button></td>
@@ -3321,8 +3354,39 @@ function abrirDocCliente(cotId) {
     .inicializarClienteDesdeAPUs(cotId);
 }
 
-function renderDocCliente(doc) {
-  if (!doc) { showToast("No se encontró la cotización", "error"); return; }
+function renderDocCliente(docRaw) {
+  console.log("DIAG renderDocCliente: tipo recibido =", typeof docRaw, "| valor crudo =", docRaw, "| cliCotId =", cliCotId);
+  // El backend ahora devuelve un STRING JSON. Si llega null/no-string, lo mostramos tal cual.
+  if (docRaw === null || docRaw === undefined) {
+    document.getElementById("cli-tbody").innerHTML =
+      '<tr><td colspan="7" style="padding:18px;text-align:left;color:#c62828;font-family:monospace;font-size:11px">' +
+      'El servidor devolvió <b>' + String(docRaw) + '</b> (tipo ' + (typeof docRaw) + ') — la función NO está entregando datos.<br>' +
+      'cliCotId = ' + cliCotId + '</td></tr>';
+    showToast("Servidor devolvió " + String(docRaw), "error");
+    return;
+  }
+  let doc;
+  try { doc = (typeof docRaw === "string") ? JSON.parse(docRaw) : docRaw; }
+  catch (e) {
+    document.getElementById("cli-tbody").innerHTML =
+      '<tr><td colspan="7" style="padding:18px;color:#c62828;font-family:monospace;font-size:11px">No se pudo parsear: ' + docRaw + '</td></tr>';
+    return;
+  }
+  if (doc.__diag || doc.encontrada === false) {
+    const d = doc;
+    document.getElementById("cli-tbody").innerHTML =
+      '<tr><td colspan="7" style="padding:18px;text-align:left;color:#c62828;font-family:monospace;font-size:11px">' +
+      'getCotizacionClienteDoc diagnóstico:<br>' +
+      (d.error ? ('• ERROR: <b>' + d.error + '</b><br>• stack: ' + d.stack + '<br>') : '') +
+      '• id recibido: <b>' + JSON.stringify(d.cotIdRecibido) + '</b> (tipo ' + d.tipoCotId + ')<br>' +
+      '• spreadsheet: <b>' + (d.spreadsheetNombre || '?') + '</b> (id ' + (d.spreadsheetId || '?') + ')<br>' +
+      '• hoja Cotizaciones: ' + (d.sheetCotizaciones || '?') + ', filas: ' + d.totalFilas + '<br>' +
+      '• ids que ve en la hoja: ' + JSON.stringify(d.idsEnHoja) + '<br>' +
+      '• headers: ' + JSON.stringify(d.headers) +
+      '</td></tr>';
+    showToast("Diagnóstico mostrado en la tabla", "error");
+    return;
+  }
   cliActual = doc;
   const { cot, items, cfg } = doc;
 
@@ -3384,15 +3448,15 @@ function renderFilaCliente(item) {
   tr.style.borderBottom = "1px solid #eee";
   tr.innerHTML = `
     <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${(item.item_num||'').replace(/"/g,'&quot;')}" placeholder="1.1"
+      <input type="text" class="cell-input" value="${String(item.item_num||'').replace(/"/g,'&quot;')}" placeholder="1.1"
         style="width:44px;text-align:center;font-weight:700;color:#1a237e"
         onchange="guardarCampoCliente(${id},'item_num',this.value)"></td>
     <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${(item.descripcion||'').replace(/"/g,'&quot;')}" placeholder="Descripción..."
+      <input type="text" class="cell-input" value="${String(item.descripcion||'').replace(/"/g,'&quot;')}" placeholder="Descripción..."
         style="width:100%"
         onchange="guardarCampoCliente(${id},'descripcion',this.value)"></td>
     <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${(item.unidad||'').replace(/"/g,'&quot;')}" placeholder="und"
+      <input type="text" class="cell-input" value="${String(item.unidad||'').replace(/"/g,'&quot;')}" placeholder="und"
         style="width:44px;text-align:center"
         onchange="guardarCampoCliente(${id},'unidad',this.value)"></td>
     <td style="padding:5px 6px">

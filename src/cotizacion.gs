@@ -667,14 +667,10 @@ function getCotizacionCompleta(cotId) {
 function agregarAPUaCotizacion(cotId, apuId, cantidad) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  const apuSheet = ss.getSheetByName("APU");
-  const apuData  = apuSheet.getDataRange().getValues();
-  const apuH     = apuData[0];
-  const apuRow   = apuData.slice(1).find(r => r[0] == apuId);
-  if (!apuRow) return { ok: false };
-
-  const apu = {};
-  apuH.forEach((h, i) => apu[h] = apuRow[i]);
+  // APU completo, leído de la hoja (no del frontend): incluye cliente, direccion
+  // y los sub-ítems (equipos/materiales/mano_obra/otros).
+  const apu = getAPUCompleto(apuId);
+  if (!apu) return { ok: false };
 
   const sheet  = ss.getSheetByName("Cotizacion_Items");
   const data   = sheet.getDataRange().getValues();
@@ -697,8 +693,50 @@ function agregarAPUaCotizacion(cotId, apuId, cantidad) {
     cant, precioAPU, valTotal
   ]);
 
+  // Heredar cliente / dirección del APU hacia la cotización si aún están vacíos.
+  const datosCliente = heredarDatosClienteSiVacios(ss, cotId, apu);
+
   recalcularCotizacion(ss, cotId);
-  return { id: newId, valor_total: valTotal };
+  return {
+    id:          newId,
+    valor_total: valTotal,
+    cliente:     datosCliente.cliente,
+    direccion:   datosCliente.direccion,
+    apu: {
+      equipos:    apu.equipos    || [],
+      materiales: apu.materiales || [],
+      mano_obra:  apu.mano_obra  || [],
+      otros:      apu.otros      || [],
+    },
+  };
+}
+
+// Copia cliente/dirección del APU a la cotización SOLO si la cotización los tiene
+// vacíos. Devuelve los valores resultantes (heredados o los que ya tenía).
+function heredarDatosClienteSiVacios(ss, cotId, apu) {
+  const sheet = ss.getSheetByName("Cotizaciones");
+  const data  = sheet.getDataRange().getValues();
+  const h     = data[0];
+  const cCli  = h.indexOf("cliente");
+  const cDir  = h.indexOf("direccion");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == cotId) {
+      let cliente   = cCli >= 0 ? String(data[i][cCli] || "").trim() : "";
+      let direccion = cDir >= 0 ? String(data[i][cDir] || "").trim() : "";
+
+      if (!cliente && apu.cliente) {
+        cliente = String(apu.cliente).trim();
+        if (cCli >= 0) sheet.getRange(i + 1, cCli + 1).setValue(cliente);
+      }
+      if (!direccion && apu.direccion) {
+        direccion = String(apu.direccion).trim();
+        if (cDir >= 0) sheet.getRange(i + 1, cDir + 1).setValue(direccion);
+      }
+      return { cliente: cliente, direccion: direccion };
+    }
+  }
+  return { cliente: "", direccion: "" };
 }
 
 // ─── ELIMINAR ÍTEM DE COTIZACIÓN ─────────────────────────────────────────────
@@ -762,7 +800,7 @@ function actualizarCotizacion(cotId, datos) {
         }
       });
       recalcularCotizacion(ss, cotId);
-      return { ok: true };
+      return { ok: true, spreadsheetId: ss.getId(), spreadsheetNombre: ss.getName() };
     }
   }
   return { ok: false };
