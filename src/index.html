@@ -2540,8 +2540,14 @@ function agregarLineaManualUI() {
           google.script.run
             .withSuccessHandler(apuCompleto => insertarSubitemsFilaCot(res.id, apuCompleto))
             .getAPUCompleto(apuId);
-          if (esElPrimero && apu.cliente) {
-            google.script.run.actualizarCotizacion(cotActual.id, { cliente: apu.cliente });
+          if (esElPrimero) {
+            const cliente   = apu.cliente   || "";
+            const direccion = apu.direccion || "";
+            if (cliente)   document.getElementById("cot-cliente").value   = cliente;
+            if (direccion) document.getElementById("cot-direccion").value = direccion;
+            if (cliente || direccion) {
+              google.script.run.actualizarCotizacion(cotActual.id, { cliente, direccion });
+            }
           }
         })
         .withFailureHandler(err => showToast("Error: " + err.message, "error"))
