@@ -1538,14 +1538,15 @@
 
   function descargarAPU() {
     if (!apuActual) { showToast("Guarda el APU primero.", "warning"); return; }
-    btnSetEstado("btn-dl-apu", "loading", "⏳ Generando Excel...");
+    btnSetEstado("btn-dl-apu", "loading", "⏳ Generando...");
     google.script.run
       .withSuccessHandler(res => {
         if (!res.ok) {
-          btnSetEstado("btn-dl-apu", "error", "✕ Error al generar");
+          btnSetEstado("btn-dl-apu", "error", "✕ Error");
           showToast("Error generando Excel: " + res.error, "error");
           return;
         }
+        // Descargar al navegador
         const blob = b64toBlob(res.base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement("a");
@@ -1553,8 +1554,25 @@
         a.download = res.fileName;
         a.click();
         URL.revokeObjectURL(url);
-        btnSetEstado("btn-dl-apu", "success", "✓ Descargado");
-        showAlert("Excel Descargado", "El APU fue descargado exitosamente.\n" + res.fileName, "success");
+
+        // También guardar en Drive
+        btnSetEstado("btn-dl-apu", "loading", "☁ Guardando en Drive...");
+        google.script.run
+          .withSuccessHandler(driveRes => {
+            if (driveRes && !driveRes.ok) {
+              btnSetEstado("btn-dl-apu", "error", "✕ Error Drive");
+              showToast("Descargado, pero error en Drive: " + driveRes.error, "error");
+            } else {
+              btnSetEstado("btn-dl-apu", "success", "✓ Listo");
+              showToast("APU descargado y guardado en Drive ✓", "success");
+              setTimeout(() => btnSetEstado("btn-dl-apu", "", "⬇ Descargar APU"), 2500);
+            }
+          })
+          .withFailureHandler(err => {
+            btnSetEstado("btn-dl-apu", "error", "✕ Error Drive");
+            showToast("Descargado, pero error en Drive: " + err.message, "error");
+          })
+          .exportarAPUaDrive(apuActual);
       })
       .withFailureHandler(err => {
         btnSetEstado("btn-dl-apu", "error", "✕ Error");
