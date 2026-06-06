@@ -7,6 +7,13 @@
   <title>Sistema APU</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    @media print {
+      body > *:not(#v-cot-cliente) { display: none !important; }
+      #v-cot-cliente { display: block !important; }
+      #v-cot-cliente .toolbar { display: none !important; }
+      .no-print { display: none !important; }
+      #cli-doc { box-shadow: none !important; margin: 0 !important; padding: 16px !important; }
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -3122,6 +3129,90 @@ function agregarLineaManualUI() {
     }
   })();
 </script>
+
+<!-- ═══════════════════════════════════════════════
+     VISTA: DOCUMENTO COTIZACIÓN CLIENTE
+════════════════════════════════════════════════ -->
+<div id="v-cot-cliente" style="display:none">
+  <div class="toolbar">
+    <button class="btn btn-back" onclick="irTabCots()">← Volver</button>
+    <h2 id="cli-titulo">Documento Cliente</h2>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn-action btn-azul" id="btn-imprimir-cli" onclick="window.print()" style="font-size:12px;padding:7px 16px">🖨 Imprimir / PDF</button>
+      <button class="btn-action btn-verde" id="btn-export-cli" onclick="exportarClienteXlsx()" style="font-size:12px;padding:7px 16px">⬇ Guardar .xlsx</button>
+    </div>
+  </div>
+
+  <!-- Documento imprimible -->
+  <div id="cli-doc" style="background:#fff;max-width:860px;margin:20px auto;padding:32px 40px;box-shadow:0 2px 12px rgba(0,0,0,.12);font-family:'Segoe UI',Arial,sans-serif;font-size:13px">
+
+    <!-- Membrete -->
+    <div style="border-bottom:3px solid #1a237e;padding-bottom:14px;margin-bottom:18px">
+      <div id="cli-empresa" style="font-size:18px;font-weight:700;color:#1a237e"></div>
+      <div id="cli-datos-empresa" style="font-size:11px;color:#555;margin-top:2px"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px">
+        <div></div>
+        <div style="text-align:right">
+          <div id="cli-oferta" style="font-size:14px;font-weight:700;color:#1a237e"></div>
+          <div id="cli-fecha" style="font-size:11px;color:#555"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Destinatario -->
+    <div style="margin-bottom:18px">
+      <div><strong>Señores:</strong> <span id="cli-cliente"></span></div>
+      <div id="cli-direccion-wrap" style="display:none"><strong>Dirección:</strong> <span id="cli-direccion"></span></div>
+    </div>
+    <p style="margin-bottom:18px;color:#333">Por medio de la presente nos permitimos presentar nuestra oferta de precios para la ejecución de las siguientes actividades:</p>
+
+    <!-- Tabla de ítems -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:6px" id="cli-tabla">
+      <thead>
+        <tr style="background:#1a237e;color:#fff;font-size:12px">
+          <th style="width:52px;padding:7px 8px;text-align:center">ÍTEM</th>
+          <th style="padding:7px 8px;text-align:left">DESCRIPCIÓN</th>
+          <th style="width:55px;padding:7px 8px;text-align:center">UND</th>
+          <th style="width:70px;padding:7px 8px;text-align:right">CANT</th>
+          <th style="width:120px;padding:7px 8px;text-align:right">VR. UNITARIO</th>
+          <th style="width:120px;padding:7px 8px;text-align:right">VR. TOTAL</th>
+          <th class="no-print" style="width:28px"></th>
+        </tr>
+      </thead>
+      <tbody id="cli-tbody"></tbody>
+    </table>
+    <button class="btn-add no-print" onclick="agregarFilaCliente()" style="margin-bottom:16px">+ Agregar fila</button>
+
+    <!-- Totales -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+      <table style="font-size:12px;border-collapse:collapse;min-width:300px">
+        <tr><td style="padding:4px 12px;color:#555">COSTO DIRECTO</td><td style="padding:4px 8px;text-align:right;font-weight:600" id="cli-cd">$ 0</td></tr>
+        <tr><td style="padding:4px 12px;color:#555">ADMINISTRACIÓN (<span id="cli-adm-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-adm-val">$ 0</td></tr>
+        <tr><td style="padding:4px 12px;color:#555">IMPREVISTOS (<span id="cli-imp-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-imp-val">$ 0</td></tr>
+        <tr><td style="padding:4px 12px;color:#555">UTILIDAD (<span id="cli-utl-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-utl-val">$ 0</td></tr>
+        <tr><td style="padding:4px 12px;color:#555">SUBTOTAL SIN IVA</td><td style="padding:4px 8px;text-align:right" id="cli-sin-iva">$ 0</td></tr>
+        <tr><td style="padding:4px 12px;color:#555">IVA (<span id="cli-iva-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-iva-val">$ 0</td></tr>
+        <tr style="background:#e8eaf6;font-weight:700">
+          <td style="padding:7px 12px">VALOR TOTAL OFERTA</td>
+          <td style="padding:7px 8px;text-align:right;color:#1a237e;font-size:14px" id="cli-total">$ 0</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Condiciones comerciales -->
+    <div id="cli-condiciones" style="font-size:12px;border-top:1px solid #ddd;padding-top:14px;margin-bottom:20px;display:grid;grid-template-columns:160px 1fr;gap:6px 12px;color:#333">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Cierre -->
+    <div style="border-top:1px solid #ddd;padding-top:18px;font-size:12px;color:#333">
+      <p style="margin-bottom:24px">Quedamos atentos a sus consultas. &nbsp; Cordialmente,</p>
+      <div id="cli-firmante-nombre" style="font-weight:700"></div>
+      <div id="cli-firmante-cargo" style="color:#555"></div>
+      <div id="cli-firmante-empresa" style="color:#555"></div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
