@@ -37,6 +37,47 @@ function migrarLogoConfig() {
   }
 }
 
+// Agrega claves de empresa y carpeta_cotizaciones_cliente a Configuracion si no existen.
+function migrarConfigEmpresa() {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const cfg = ss.getSheetByName("Configuracion");
+  if (!cfg) { SpreadsheetApp.getUi().alert("Hoja Configuracion no encontrada."); return; }
+
+  const nuevas = [
+    ["nit",                         "", "NIT de la empresa (ej: 900.123.456-7)"],
+    ["telefono",                    "", "Teléfono de la empresa"],
+    ["email_empresa",               "", "Email de contacto"],
+    ["cargo",                       "", "Cargo del firmante (ej: Ingeniero Mecánico)"],
+    ["tarjeta_profesional",         "", "Número de tarjeta profesional"],
+    ["carpeta_cotizaciones_cliente","", "ID carpeta Drive para cotizaciones cliente"],
+  ];
+
+  const claves = cfg.getDataRange().getValues().slice(1).map(r => String(r[0]).trim());
+  let added = 0;
+  nuevas.forEach(([clave, valor, desc]) => {
+    if (!claves.includes(clave)) { cfg.appendRow([clave, valor, desc]); added++; }
+  });
+
+  SpreadsheetApp.getUi().alert(
+    added > 0
+      ? "✅ " + added + " clave(s) nueva(s) agregada(s) a Configuracion."
+      : "✅ Todas las claves ya existían. No se hicieron cambios."
+  );
+}
+
+// Crea la hoja Cotizacion_Cliente_Items si no existe.
+function migrarHojaClienteItems() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName("Cotizacion_Cliente_Items")) {
+    SpreadsheetApp.getUi().alert("✅ La hoja ya existe. No se hicieron cambios.");
+    return;
+  }
+  const sheet = ss.insertSheet("Cotizacion_Cliente_Items");
+  sheet.appendRow(["id", "cotizacion_id", "item_num", "descripcion", "unidad", "cantidad", "precio_unitario", "valor_total"]);
+  sheet.setFrozenRows(1);
+  SpreadsheetApp.getUi().alert("✅ Hoja Cotizacion_Cliente_Items creada.");
+}
+
 // Agrega carpeta_firma y firma_id a Configuracion si no existen.
 function migrarConfigFirma() {
   const ss  = SpreadsheetApp.getActiveSpreadsheet();
