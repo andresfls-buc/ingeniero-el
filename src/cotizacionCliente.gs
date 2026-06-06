@@ -91,3 +91,183 @@ function eliminarFilaClienteDoc(itemId) {
   }
   return { ok: false };
 }
+
+// Genera un .xlsx formateado del documento cliente y lo guarda en Drive.
+// Devuelve { ok, url, nombre } o { ok: false, error }
+function exportarCotizacionClienteXlsx(cotId) {
+  try {
+    const doc = getCotizacionClienteDoc(cotId);
+    if (!doc) return { ok: false, error: "Cotización no encontrada" };
+    const { cot, items, cfg } = doc;
+
+    const folderId = (cfg["carpeta_cotizaciones_cliente"] || "").trim();
+    if (!folderId) return { ok: false, error: "Configura 'carpeta_cotizaciones_cliente' en la hoja Configuracion." };
+
+    const ss      = SpreadsheetApp.getActiveSpreadsheet();
+    const tmpName = "_cot_cli_tmp_";
+    let tmp = ss.getSheetByName(tmpName);
+    if (tmp) ss.deleteSheet(tmp);
+    tmp = ss.insertSheet(tmpName);
+
+    // ── LLENAR HOJA ──
+    const empresa = cfg["empresa"]           || "";
+    const nit     = cfg["nit"]               || "";
+    const tel     = cfg["telefono"]          || "";
+    const email   = cfg["email_empresa"]     || "";
+    const nombre  = cfg["nombre_remitente"]  || "";
+    const cargo   = cfg["cargo"]             || "";
+    const tp      = cfg["tarjeta_profesional"] || "";
+
+    const fecha = cot.fecha
+      ? Utilities.formatDate(new Date(cot.fecha), Session.getScriptTimeZone(), "dd 'de' MMMM 'de' yyyy")
+      : "";
+
+    let row = 1;
+
+    // Membrete
+    tmp.getRange(row, 1, 1, 6).merge().setValue(empresa).setFontSize(14).setFontWeight("bold");
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge()
+      .setValue([nit ? "NIT: " + nit : "", tel, email].filter(Boolean).join("  ·  "))
+      .setFontSize(10).setFontColor("#555555");
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge()
+      .setValue("OFERTA DE PRECIOS No. " + (cot.numero_oferta || ""))
+      .setFontSize(13).setFontWeight("bold").setHorizontalAlignment("right");
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge()
+      .setValue("Bogotá, " + fecha)
+      .setHorizontalAlignment("right").setFontSize(10).setFontColor("#555555");
+    row += 2;
+
+    // Destinatario
+    tmp.getRange(row, 1, 1, 6).merge().setValue("Señores: " + (cot.cliente || "")).setFontWeight("bold");
+    row++;
+    if (cot.direccion) {
+      tmp.getRange(row, 1, 1, 6).merge().setValue("Dirección: " + cot.direccion);
+      row++;
+    }
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge()
+      .setValue("Por medio de la presente nos permitimos presentar nuestra oferta de precios para la ejecución de las siguientes actividades:")
+      .setWrap(true);
+    row += 2;
+
+    // Encabezado tabla
+    const headers = ["ÍTEM", "DESCRIPCIÓN", "UND", "CANT", "VR. UNITARIO", "VR. TOTAL"];
+    const hRange  = tmp.getRange(row, 1, 1, 6);
+    hRange.setValues([headers])
+      .setBackground("#1a237e").setFontColor("#ffffff")
+      .setFontWeight("bold").setHorizontalAlignment("center");
+    row++;
+
+    // Filas de ítems
+    const FCOP = v => "$" + Math.round(parseFloat(v) || 0).toLocaleString("es-CO");
+    items.forEach(item => {
+      const cant  = parseFloat(item.cantidad)        || 0;
+      const precio= parseFloat(item.precio_unitario) || 0;
+      const total = Math.round(cant * precio);
+      tmp.getRange(row, 1, 1, 6).setValues([[
+        item.item_num || "",
+        item.descripcion || "",
+        item.unidad || "",
+        cant || "",
+        FCOP(precio),
+        FCOP(total),
+      ]]);
+      row++;
+    });
+    row++;
+
+    // Totales
+    const cd   = items.reduce((s, i) => s + Math.round((parseFloat(i.cantidad) || 0) * (parseFloat(i.precio_unitario) || 0)), 0);
+    const admP = parseFloat(cot.administracion_pct) || 0;
+    const impP = parseFloat(cot.imprevistos_pct)    || 0;
+    const utlP = parseFloat(cot.utilidad_pct)       || 0;
+    const ivaP = parseFloat(cot.iva_pct)            || 0;
+    const adm  = Math.round(cd * admP / 100);
+    const imp  = Math.round(cd * impP / 100);
+    const utl  = Math.round(cd * utlP / 100);
+    const sin  = cd + adm + imp + utl;
+    const iva  = Math.round(sin * ivaP / 100);
+    const tot  = sin + iva;
+
+    [
+      ["COSTO DIRECTO",                         FCOP(cd)],
+      ["ADMINISTRACIÓN (" + admP + "%)",         FCOP(adm)],
+      ["IMPREVISTOS (" + impP + "%)",            FCOP(imp)],
+      ["UTILIDAD (" + utlP + "%)",               FCOP(utl)],
+      ["SUBTOTAL SIN IVA",                       FCOP(sin)],
+      ["IVA (" + ivaP + "%)",                    FCOP(iva)],
+      ["VALOR TOTAL OFERTA",                     FCOP(tot)],
+    ].forEach(([label, val], idx) => {
+      const isTotal = idx === 6;
+      tmp.getRange(row, 4, 1, 2).merge().setValue(label)
+        .setHorizontalAlignment("right")
+        .setFontWeight(isTotal ? "bold" : "normal")
+        .setBackground(isTotal ? "#e8eaf6" : null);
+      tmp.getRange(row, 6).setValue(val)
+        .setHorizontalAlignment("right")
+        .setFontWeight(isTotal ? "bold" : "normal")
+        .setBackground(isTotal ? "#e8eaf6" : null);
+      row++;
+    });
+    row++;
+
+    // Condiciones comerciales
+    [
+      ["FORMA DE PAGO",    cot.forma_pago],
+      ["PLAZO DE ENTREGA", cot.plazo_entrega],
+      ["VALIDEZ OFERTA",   cot.validez_oferta],
+      ["NO INCLUYE",       cot.no_incluye],
+    ].filter(([, v]) => v).forEach(([label, val]) => {
+      tmp.getRange(row, 1, 1, 6).merge().setValue(label + ":  " + val).setWrap(true);
+      row++;
+    });
+    row += 2;
+
+    // Cierre
+    tmp.getRange(row, 1, 1, 6).merge().setValue("Quedamos atentos a sus consultas.  Cordialmente,");
+    row += 2;
+    tmp.getRange(row, 1, 1, 6).merge().setValue(nombre).setFontWeight("bold");
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge()
+      .setValue([cargo, tp ? "T.P. No. " + tp : ""].filter(Boolean).join("  ·  "));
+    row++;
+    tmp.getRange(row, 1, 1, 6).merge().setValue(empresa);
+
+    // Formato columnas
+    tmp.setColumnWidth(1, 55);
+    tmp.setColumnWidth(2, 280);
+    tmp.setColumnWidth(3, 55);
+    tmp.setColumnWidth(4, 65);
+    tmp.setColumnWidth(5, 110);
+    tmp.setColumnWidth(6, 110);
+    tmp.setRowHeights(1, tmp.getLastRow(), 22);
+
+    SpreadsheetApp.flush();
+
+    // Exportar como .xlsx y guardar en Drive
+    const xlsxUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
+      + "/export?format=xlsx&gid=" + tmp.getSheetId();
+    const blob = UrlFetchApp.fetch(xlsxUrl, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
+    }).getBlob();
+
+    const nombre_archivo = "COT-" + (cot.numero_oferta || cotId) + "_" + (cot.cliente || "Cliente").replace(/\s+/g, "_") + "_Cliente.xlsx";
+    blob.setName(nombre_archivo);
+
+    ss.deleteSheet(tmp);
+
+    const folder = DriveApp.getFolderById(folderId);
+    const file   = folder.createFile(blob);
+    return { ok: true, url: file.getUrl(), nombre: nombre_archivo };
+
+  } catch(e) {
+    try {
+      const bad = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("_cot_cli_tmp_");
+      if (bad) SpreadsheetApp.getActiveSpreadsheet().deleteSheet(bad);
+    } catch(_) {}
+    return { ok: false, error: e.message };
+  }
+}
