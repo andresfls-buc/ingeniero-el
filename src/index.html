@@ -2027,9 +2027,10 @@
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nuevo APU";
     document.getElementById("btn-nuevo").style.display = "";
-    document.getElementById("v-apu").style.display = "none";
-    document.getElementById("v-cot").style.display = "none";
-    document.getElementById("v-lista").style.display = "";
+    document.getElementById("v-apu").style.display         = "none";
+    document.getElementById("v-cot").style.display         = "none";
+    document.getElementById("v-cot-cliente").style.display = "none";
+    document.getElementById("v-lista").style.display       = "";
     mostrarLista();
   }
 
@@ -2040,9 +2041,10 @@
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
     document.getElementById("btn-nuevo").style.display = "";
-    document.getElementById("v-apu").style.display = "none";
-    document.getElementById("v-cot").style.display = "none";
-    document.getElementById("v-lista").style.display = "";
+    document.getElementById("v-apu").style.display         = "none";
+    document.getElementById("v-cot").style.display         = "none";
+    document.getElementById("v-cot-cliente").style.display = "none";
+    document.getElementById("v-lista").style.display       = "";
     cargarCotizaciones();
   }
 
@@ -3213,6 +3215,208 @@ function agregarLineaManualUI() {
     </div>
   </div>
 </div>
+
+<script>
+// ═══ DOCUMENTO COTIZACIÓN CLIENTE ════════════════════════════════════════════
+let cliActual   = null;  // { cot, items, cfg }
+let cliCotId    = null;
+let cliFilas    = {};    // { id: { cant, precio, total } }
+
+function abrirDocCliente(cotId) {
+  cliCotId  = cotId;
+  cliFilas  = {};
+  document.getElementById("v-lista").style.display       = "none";
+  document.getElementById("v-cot").style.display         = "none";
+  document.getElementById("v-cot-cliente").style.display = "";
+  document.getElementById("cli-tbody").innerHTML         = '<tr><td colspan="7" style="padding:14px;color:#999;text-align:center">Cargando...</td></tr>';
+  google.script.run
+    .withSuccessHandler(renderDocCliente)
+    .withFailureHandler(err => showToast("Error: " + err.message, "error"))
+    .getCotizacionClienteDoc(cotId);
+}
+
+function renderDocCliente(doc) {
+  if (!doc) { showToast("No se encontró la cotización", "error"); return; }
+  cliActual = doc;
+  const { cot, items, cfg } = doc;
+
+  // Membrete
+  document.getElementById("cli-empresa").textContent      = cfg.empresa || "";
+  document.getElementById("cli-datos-empresa").textContent =
+    [cfg.nit ? "NIT: " + cfg.nit : "", cfg.telefono, cfg.email_empresa].filter(Boolean).join("  ·  ");
+  document.getElementById("cli-oferta").textContent = "OFERTA DE PRECIOS No. " + (cot.numero_oferta || "");
+  document.getElementById("cli-fecha").textContent  = "Bogotá, " + (cot.fecha
+    ? new Date(cot.fecha).toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" })
+    : "");
+  document.getElementById("cli-titulo").textContent  = "Doc. Cliente — " + (cot.cliente || "");
+  document.getElementById("cli-cliente").textContent = cot.cliente || "";
+  const dir = cot.direccion || "";
+  document.getElementById("cli-direccion-wrap").style.display = dir ? "" : "none";
+  document.getElementById("cli-direccion").textContent = dir;
+
+  // AIU labels
+  document.getElementById("cli-adm-pct-lbl").textContent = parseFloat(cot.administracion_pct) || 0;
+  document.getElementById("cli-imp-pct-lbl").textContent = parseFloat(cot.imprevistos_pct)    || 0;
+  document.getElementById("cli-utl-pct-lbl").textContent = parseFloat(cot.utilidad_pct)       || 0;
+  document.getElementById("cli-iva-pct-lbl").textContent = parseFloat(cot.iva_pct)            || 0;
+
+  // Condiciones comerciales
+  const conds = [
+    ["FORMA DE PAGO",    cot.forma_pago],
+    ["PLAZO DE ENTREGA", cot.plazo_entrega],
+    ["VALIDEZ OFERTA",   cot.validez_oferta],
+    ["NO INCLUYE",       cot.no_incluye],
+  ].filter(([, v]) => v);
+  document.getElementById("cli-condiciones").innerHTML = conds.map(([l, v]) =>
+    `<strong>${l}:</strong><span>${v}</span>`
+  ).join("") || "";
+
+  // Firmante
+  document.getElementById("cli-firmante-nombre").textContent  = cfg.nombre_remitente || "";
+  document.getElementById("cli-firmante-cargo").textContent   =
+    [cfg.cargo, cfg.tarjeta_profesional ? "T.P. No. " + cfg.tarjeta_profesional : ""].filter(Boolean).join("  ·  ");
+  document.getElementById("cli-firmante-empresa").textContent = cfg.empresa || "";
+
+  // Filas
+  const tbody = document.getElementById("cli-tbody");
+  tbody.innerHTML = "";
+  cliFilas = {};
+  (items || []).forEach(item => renderFilaCliente(item));
+  recalcularTotalesCliente();
+}
+
+function renderFilaCliente(item) {
+  const tbody  = document.getElementById("cli-tbody");
+  const id     = item.id;
+  const cant   = parseFloat(item.cantidad)        || 0;
+  const precio = parseFloat(item.precio_unitario) || 0;
+  const total  = Math.round(cant * precio);
+  cliFilas[id] = { cant, precio, total };
+
+  const tr = document.createElement("tr");
+  tr.id    = "cli-row-" + id;
+  tr.style.borderBottom = "1px solid #eee";
+  tr.innerHTML = `
+    <td style="padding:5px 6px">
+      <input type="text" class="cell-input" value="${item.item_num || ''}" placeholder="1.1"
+        style="width:44px;text-align:center;font-weight:700;color:#1a237e"
+        onchange="guardarCampoCliente(${id},'item_num',this.value)"></td>
+    <td style="padding:5px 6px">
+      <input type="text" class="cell-input" value="${(item.descripcion||'').replace(/"/g,'&quot;')}" placeholder="Descripción..."
+        style="width:100%"
+        onchange="guardarCampoCliente(${id},'descripcion',this.value)"></td>
+    <td style="padding:5px 6px">
+      <input type="text" class="cell-input" value="${item.unidad||''}" placeholder="und"
+        style="width:44px;text-align:center"
+        onchange="guardarCampoCliente(${id},'unidad',this.value)"></td>
+    <td style="padding:5px 6px">
+      <input type="number" class="cell-input" value="${cant||''}" min="0" placeholder="0"
+        style="width:58px;text-align:right"
+        onchange="cambiarCantCliente(${id},this.value)"></td>
+    <td style="padding:5px 6px">
+      <input type="number" class="cell-input" value="${precio||''}" min="0" placeholder="0"
+        style="width:100px;text-align:right"
+        onchange="cambiarPrecioCliente(${id},this.value)"></td>
+    <td style="padding:5px 8px;text-align:right;font-weight:600" id="cli-vp-${id}">${COP(total)}</td>
+    <td class="no-print" style="padding:3px">
+      <button class="btn-del" onclick="eliminarFilaCliente(${id})">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function guardarCampoCliente(id, campo, val) {
+  clearTimeout(window["cli_" + id + "_" + campo]);
+  window["cli_" + id + "_" + campo] = setTimeout(() => {
+    google.script.run.actualizarFilaClienteDoc(id, { [campo]: val });
+  }, 700);
+}
+
+function cambiarCantCliente(id, val) {
+  const f = cliFilas[id]; if (!f) return;
+  f.cant  = parseFloat(val) || 0;
+  f.total = Math.round(f.cant * f.precio);
+  document.getElementById("cli-vp-" + id).textContent = COP(f.total);
+  recalcularTotalesCliente();
+  guardarCampoCliente(id, "cantidad", f.cant);
+}
+
+function cambiarPrecioCliente(id, val) {
+  const f = cliFilas[id]; if (!f) return;
+  f.precio = parseFloat(val) || 0;
+  f.total  = Math.round(f.cant * f.precio);
+  document.getElementById("cli-vp-" + id).textContent = COP(f.total);
+  recalcularTotalesCliente();
+  guardarCampoCliente(id, "precio_unitario", f.precio);
+}
+
+function recalcularTotalesCliente() {
+  if (!cliActual) return;
+  const { cot } = cliActual;
+  const cd   = Object.values(cliFilas).reduce((s, f) => s + (f ? f.total : 0), 0);
+  const admP = parseFloat(cot.administracion_pct) || 0;
+  const impP = parseFloat(cot.imprevistos_pct)    || 0;
+  const utlP = parseFloat(cot.utilidad_pct)       || 0;
+  const ivaP = parseFloat(cot.iva_pct)            || 0;
+  const adm  = Math.round(cd * admP / 100);
+  const imp  = Math.round(cd * impP / 100);
+  const utl  = Math.round(cd * utlP / 100);
+  const sin  = cd + adm + imp + utl;
+  const iva  = Math.round(sin * ivaP / 100);
+  const tot  = sin + iva;
+  document.getElementById("cli-cd").textContent      = COP(cd);
+  document.getElementById("cli-adm-val").textContent = COP(adm);
+  document.getElementById("cli-imp-val").textContent = COP(imp);
+  document.getElementById("cli-utl-val").textContent = COP(utl);
+  document.getElementById("cli-sin-iva").textContent = COP(sin);
+  document.getElementById("cli-iva-val").textContent = COP(iva);
+  document.getElementById("cli-total").textContent   = COP(tot);
+}
+
+function agregarFilaCliente() {
+  if (!cliCotId) return;
+  google.script.run
+    .withSuccessHandler(res => {
+      if (!res || !res.id) return;
+      const blankItem = { id: res.id, item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_unitario: 0 };
+      renderFilaCliente(blankItem);
+      recalcularTotalesCliente();
+      const row = document.getElementById("cli-row-" + res.id);
+      if (row) setTimeout(() => row.querySelector("input").focus(), 50);
+    })
+    .withFailureHandler(err => showToast("Error: " + err.message, "error"))
+    .agregarFilaClienteDoc(cliCotId);
+}
+
+function eliminarFilaCliente(id) {
+  showConfirm("¿Eliminar esta fila?", () => {
+    const row = document.getElementById("cli-row-" + id);
+    if (row) row.remove();
+    delete cliFilas[id];
+    recalcularTotalesCliente();
+    google.script.run.eliminarFilaClienteDoc(id);
+  }, "Eliminar");
+}
+
+function exportarClienteXlsx() {
+  if (!cliCotId) return;
+  btnSetEstado("btn-export-cli", "loading", "Generando...");
+  google.script.run
+    .withSuccessHandler(res => {
+      if (res && res.ok) {
+        btnSetEstado("btn-export-cli", "success", "✓ Guardado");
+        showToast("Guardado en Drive: " + res.nombre, "success");
+        setTimeout(() => btnSetEstado("btn-export-cli", "", "⬇ Guardar .xlsx"), 3000);
+      } else {
+        btnSetEstado("btn-export-cli", "error", "✕ Error");
+        showToast("Error: " + (res && res.error ? res.error : "desconocido"), "error");
+      }
+    })
+    .withFailureHandler(err => {
+      btnSetEstado("btn-export-cli", "error", "✕ Error");
+      showToast("Error: " + err.message, "error");
+    })
+    .exportarCotizacionClienteXlsx(cliCotId);
+}
+</script>
 
 </body>
 </html>
