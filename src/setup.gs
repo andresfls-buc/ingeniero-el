@@ -240,12 +240,13 @@ function setupDatabase() {
     "id", "numero_oferta", "cliente", "direccion", "fecha",
     "valor_neto", "administracion_pct", "imprevistos_pct",
     "utilidad_pct", "iva_pct", "valor_total", "aprobada", "notas",
-    "forma_pago", "plazo_entrega", "validez_oferta", "no_incluye"
+    "forma_pago", "plazo_entrega", "validez_oferta", "no_incluye", "objeto"
   ]);
 
   createSheet(ss, "Cotizacion_Items", [
     "id", "cotizacion_id", "apu_id", "item_num", "descripcion",
-    "unidad", "cantidad", "precio_apu", "valor_total"
+    "unidad", "cantidad", "precio_apu", "valor_total",
+    "capitulo_num", "capitulo_nombre"
   ]);
 
   // === CONFIGURACIÓN ===
