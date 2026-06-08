@@ -850,7 +850,7 @@ function actualizarCotizacion(cotId, datos) {
         }
       });
       recalcularCotizacion(ss, cotId);
-      return { ok: true, spreadsheetId: ss.getId(), spreadsheetNombre: ss.getName() };
+      return { ok: true };
     }
   }
   return { ok: false };
