@@ -8,11 +8,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     @media print {
-      body > *:not(#v-cot-cliente) { display: none !important; }
-      #v-cot-cliente { display: block !important; }
-      #v-cot-cliente .toolbar { display: none !important; }
       .no-print { display: none !important; }
-      #cli-doc { box-shadow: none !important; margin: 0 !important; padding: 16px !important; }
     }
 
     body {
@@ -777,8 +773,8 @@
     <h1>Sistema APU</h1>
     <div class="tab-group">
       <button class="tab-btn active" id="tab-apus" onclick="irTabAPUs()">APUs</button>
-      <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Internas</button>
-      <button class="tab-btn" id="tab-cots-cli" onclick="irTabCotsCliente()">Clientes</button>
+      <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Cotizaciones</button>
+
       <button class="tab-btn" id="tab-archivos" onclick="irTabArchivos()">Mis Archivos</button>
     </div>
     <button class="btn btn-back" onclick="abrirGestionarBD()" style="border-color:rgba(255,255,255,0.5)">⚙ BD de Precios</button>
@@ -998,12 +994,6 @@
       <button class="btn-action btn-naranja" id="btn-dl-apu" onclick="descargarAPU()">
         ⬇ Descargar APU
       </button>
-      <button class="btn-action btn-azul" id="btn-ir-internas" onclick="irTabCots()">
-        → Cotizaciones Internas
-      </button>
-      <button class="btn-action btn-verde" id="btn-ir-clientes" onclick="irTabCotsCliente()">
-        → Cotizaciones Clientes
-      </button>
     </div>
 
   </div><!-- /container -->
@@ -1024,7 +1014,11 @@
     <div class="card sec-items">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>CUADRO DE COTIZACIÓN</span>
-        <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <label style="font-size:11px;color:#cfd8dc;white-space:nowrap">Cap. #</label>
+          <input type="number" id="cot-capitulo" min="1" value="1" style="width:44px;text-align:center;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:3px 4px;font-size:12px;background:rgba(255,255,255,0.12);color:#fff">
+          <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
+        </div>
       </div>
       <table class="apu-table">
         <thead>
@@ -1143,11 +1137,8 @@
     </div>
 
     <div class="actions-bar">
-      <button class="btn-action btn-naranja" id="btn-ir-cliente" onclick="irADocCliente()">
-        → Pasar a Cotización Cliente
-      </button>
       <button class="btn-action" id="btn-pdf-interna" onclick="descargarPDF('interna')" style="background:#607d8b;color:#fff">
-        ⬇ Cotización interna / auditoría (.xlsx)
+        ⬇ Descargar cotización (.xlsx)
       </button>
       <button class="btn-action btn-celeste" id="btn-email" onclick="enviarPorCorreo()">
         ✉ Enviar al cliente y guardar
@@ -1607,7 +1598,6 @@
                 tabActual = "cots";
                 document.getElementById("tab-cots").classList.add("active");
                 document.getElementById("tab-apus").classList.remove("active");
-                document.getElementById("tab-cots-cli").classList.remove("active");
                 document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
                 document.getElementById("v-apu").style.display  = "none";
                 document.getElementById("v-lista").style.display = "none";
@@ -2046,14 +2036,12 @@
     tabActual = "apus";
     document.getElementById("tab-apus").classList.add("active");
     document.getElementById("tab-cots").classList.remove("active");
-    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nuevo APU";
     document.getElementById("btn-nuevo").style.display = "";
-    document.getElementById("v-apu").style.display         = "none";
-    document.getElementById("v-cot").style.display         = "none";
-    document.getElementById("v-cot-cliente").style.display = "none";
-    document.getElementById("v-lista").style.display       = "";
+    document.getElementById("v-apu").style.display   = "none";
+    document.getElementById("v-cot").style.display   = "none";
+    document.getElementById("v-lista").style.display = "";
     mostrarLista();
   }
 
@@ -2061,62 +2049,13 @@
     tabActual = "cots";
     document.getElementById("tab-cots").classList.add("active");
     document.getElementById("tab-apus").classList.remove("active");
-    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("tab-archivos").classList.remove("active");
     document.getElementById("btn-nuevo").textContent = "+ Nueva Cotización";
     document.getElementById("btn-nuevo").style.display = "";
-    document.getElementById("v-apu").style.display         = "none";
-    document.getElementById("v-cot").style.display         = "none";
-    document.getElementById("v-cot-cliente").style.display = "none";
-    document.getElementById("v-lista").style.display       = "";
+    document.getElementById("v-apu").style.display   = "none";
+    document.getElementById("v-cot").style.display   = "none";
+    document.getElementById("v-lista").style.display = "";
     cargarCotizaciones();
-  }
-
-  function irTabCotsCliente() {
-    tabActual = "cots-cli";
-    document.getElementById("tab-cots-cli").classList.add("active");
-    document.getElementById("tab-apus").classList.remove("active");
-    document.getElementById("tab-cots").classList.remove("active");
-    document.getElementById("tab-archivos").classList.remove("active");
-    document.getElementById("btn-nuevo").style.display     = "none";
-    document.getElementById("v-apu").style.display         = "none";
-    document.getElementById("v-cot").style.display         = "none";
-    document.getElementById("v-cot-cliente").style.display = "none";
-    document.getElementById("v-lista").style.display       = "";
-    cargarCotizacionesCliente();
-  }
-
-  function cargarCotizacionesCliente() {
-    const el = document.getElementById("lista-container");
-    el.innerHTML = '<div class="loading">Cargando...</div>';
-    google.script.run
-      .withSuccessHandler(renderCotizacionesCliente)
-      .withFailureHandler(err => el.innerHTML = "Error: " + err.message)
-      .listarCotizaciones();
-  }
-
-  function renderCotizacionesCliente(cots) {
-    const el = document.getElementById("lista-container");
-    if (!cots || cots.length === 0) {
-      el.innerHTML = '<p class="empty">No hay cotizaciones. Créalas primero en la pestaña Internas.</p>';
-      return;
-    }
-    el.innerHTML = `<table class="list-table">
-      <thead><tr>
-        <th>N° OFERTA</th><th>CLIENTE</th><th>FECHA</th>
-        <th class="num">VALOR TOTAL</th><th>ESTADO</th><th></th>
-      </tr></thead>
-      <tbody>${cots.map(c => `<tr>
-        <td class="mono">${c.numero_oferta || '—'}</td>
-        <td>${c.cliente || '—'}</td>
-        <td>${c.fecha || '—'}</td>
-        <td class="num">${COP(c.valor_total)}</td>
-        <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
-        <td>
-          <button class="btn-open" style="border-color:#2e7d32;color:#2e7d32" onclick="abrirDocCliente(${c.id})">Abrir →</button>
-        </td>
-      </tr>`).join('')}</tbody>
-    </table>`;
   }
 
   function cargarCotizaciones() {
@@ -2209,6 +2148,7 @@
       .forEach(id => document.getElementById(id).value = "");
     document.getElementById("body-cuadro").innerHTML = "";
     cotItems = {};
+    document.getElementById("cot-capitulo").value  = 1;
     document.getElementById("cot-adm-pct").value  = 0;
     document.getElementById("cot-imp-pct").value  = 0;
     document.getElementById("cot-util-pct").value = 0;
@@ -2244,43 +2184,6 @@
     }
   }
 
-  // Pasar de la cotización interna al documento del cliente, llevando los datos del APU.
-  function irADocCliente() {
-    if (!cotActual || !cotActual.id) {
-      showToast("Agrega al menos un APU antes de pasar a la cotización del cliente.", "warning");
-      return;
-    }
-    // Persistir el encabezado (cliente, dirección, AIU, condiciones) antes de abrir el doc del cliente,
-    // así el documento del cliente refleja lo último que escribiste.
-    const datos = {
-      cliente:            document.getElementById("cot-cliente").value,
-      direccion:          document.getElementById("cot-direccion").value,
-      forma_pago:         document.getElementById("cot-forma-pago").value,
-      plazo_entrega:      document.getElementById("cot-plazo-entrega").value,
-      validez_oferta:     document.getElementById("cot-validez-oferta").value,
-      no_incluye:         document.getElementById("cot-no-incluye").value,
-      administracion_pct: parseFloat(document.getElementById("cot-adm-pct").value)  || 0,
-      imprevistos_pct:    parseFloat(document.getElementById("cot-imp-pct").value)  || 0,
-      utilidad_pct:       parseFloat(document.getElementById("cot-util-pct").value) || 0,
-      iva_pct:            parseFloat(document.getElementById("cot-iva-pct").value)  || 0,
-    };
-    setCotEstado("Guardando...");
-    console.log("DIAG irADocCliente: cotActual.id =", cotActual.id, "tipo =", typeof cotActual.id);
-    google.script.run
-      .withSuccessHandler((res) => {
-        console.log("DIAG actualizarCotizacion devolvió:", JSON.stringify(res), "(ok:false = id no encontrado en la hoja)");
-        tabActual = "cots-cli";
-        document.getElementById("tab-cots-cli").classList.add("active");
-        document.getElementById("tab-cots").classList.remove("active");
-        document.getElementById("tab-apus").classList.remove("active");
-        document.getElementById("tab-archivos").classList.remove("active");
-        document.getElementById("btn-nuevo").style.display = "none";
-        abrirDocCliente(cotActual.id);
-      })
-      .withFailureHandler(err => showToast("Error guardando: " + err.message, "error"))
-      .actualizarCotizacion(cotActual.id, datos);
-  }
-
   // Fila en el cuadro de cotización (con sub-ítems inline)
   function renderFilaCot(item, itemNum) {
     const tbody  = document.getElementById("body-cuadro");
@@ -2305,57 +2208,12 @@
       <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
     </tr>`;
 
-    html += renderSubitemsHTML(id, item);
     tbody.insertAdjacentHTML("beforeend", html);
-  }
-
-  function renderSubitemsHTML(cotItemId, itemData) {
-    const secciones = [
-      { key: "equipos",    label: "EQUIPOS",      color: "#e8f5e9", hcolor: "#2e7d32" },
-      { key: "materiales", label: "MATERIALES",   color: "#fff8e1", hcolor: "#f57f17" },
-      { key: "mano_obra",  label: "MANO DE OBRA", color: "#fce4ec", hcolor: "#c62828" },
-      { key: "otros",      label: "OTROS",         color: "#f3e5f5", hcolor: "#6a1b9a" },
-    ];
-    let html = "";
-    secciones.forEach(sec => {
-      const subitems = itemData[sec.key] || [];
-      if (!subitems.length) return;
-      html += `<tr class="crow-detail" data-cotitem-id="${cotItemId}" style="background:${sec.color}">
-        <td></td>
-        <td colspan="7" style="padding:3px 14px 3px 28px;font-size:10px;font-weight:700;color:${sec.hcolor};letter-spacing:.6px;text-transform:uppercase">${sec.label}</td>
-      </tr>`;
-      subitems.forEach(it => {
-        const cant  = it.cantidad    != null ? it.cantidad    : "—";
-        const rend  = it.rendimiento != null && it.rendimiento !== "" ? it.rendimiento : "—";
-        const mostrarUnidad = sec.key === "materiales";
-        html += `<tr class="crow-detail" data-cotitem-id="${cotItemId}" style="background:#fafafa">
-          <td></td>
-          <td></td>
-          <td ${mostrarUnidad ? "" : 'colspan="2"'} style="padding-left:32px;font-size:11px;color:#333">${it.descripcion_manual || "—"}</td>
-          ${mostrarUnidad ? `<td style="text-align:center;font-size:11px;color:#555">${it.unidad || ""}</td>` : ""}
-          <td style="text-align:right;font-size:11px;color:#555">${cant} <small style="color:#aaa">(rend: ${rend})</small></td>
-          <td style="text-align:right;font-size:11px;color:#555">${COP(it.precio_unitario)}</td>
-          <td style="text-align:right;font-size:11px;color:#444;font-weight:600">${COP(it.valor_parcial)}</td>
-          <td></td>
-        </tr>`;
-      });
-    });
-    return html;
-  }
-
-  function insertarSubitemsFilaCot(cotItemId, apu) {
-    if (!apu) return;
-    const mainRow = document.getElementById("crow-" + cotItemId);
-    if (!mainRow) return;
-    // Eliminar sub-ítems anteriores si existen
-    document.querySelectorAll(`.crow-detail[data-cotitem-id="${cotItemId}"]`).forEach(r => r.remove());
-    // Insertar nuevos
-    mainRow.insertAdjacentHTML("afterend", renderSubitemsHTML(cotItemId, apu));
   }
 
   function eliminarFilaCot(id) {
     showConfirm("¿Eliminar este APU de la cotización?", () => {
-      document.querySelectorAll(`[data-cotitem-id="${id}"]`).forEach(el => el.remove());
+      document.getElementById("crow-" + id)?.remove();
       delete cotItems[id];
       recalcularTotalCot();
       google.script.run.eliminarItemCotizacion(id);
@@ -2432,17 +2290,17 @@
 
 function agregarLineaManualUI() {
     if (!cotActual) { showToast("Guarda la cotización primero.", "warning"); return; }
+    const itemNumStr = siguienteItemNum();
     google.script.run
       .withSuccessHandler(result => {
         if (!result || !result.id) return;
         const blankItem = {
-          id: result.id, apu_id: "", item_num: "", descripcion: "", unidad: "",
+          id: result.id, apu_id: "", item_num: itemNumStr, descripcion: "", unidad: "",
           cantidad: 1, precio_apu: 0,
           equipos: [], materiales: [], mano_obra: [], otros: [],
         };
         renderFilaCot(blankItem, Object.keys(cotItems).length + 1);
         recalcularTotalCot();
-        // Focus the description field of the new row
         const newRow = document.getElementById("crow-" + result.id);
         if (newRow) {
           const descInput = newRow.querySelector("td:nth-child(2) input");
@@ -2450,7 +2308,7 @@ function agregarLineaManualUI() {
         }
       })
       .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-      .agregarLineaManual(cotActual.id, { item_num: "", descripcion: "", unidad: "", cantidad: 1, precio_apu: 0 });
+      .agregarLineaManual(cotActual.id, { item_num: itemNumStr, descripcion: "", unidad: "", cantidad: 1, precio_apu: 0 });
   }
 
     function toggleAprobada() {
@@ -2558,14 +2416,16 @@ function agregarLineaManualUI() {
       const cant = parseFloat(cantStr);
       if (isNaN(cant) || cant <= 0) return;
 
-      const apu      = todosLosAPUs.find(a => a.id == apuId) || {};
-      const precio   = parseFloat(apu.costo_neto) || 0;
-      const tempId   = "t" + Date.now();
-      const itemNum  = Object.keys(cotItems).length + 1;
-      const item     = {
+      const apu        = todosLosAPUs.find(a => a.id == apuId) || {};
+      const precio     = parseFloat(apu.costo_neto) || 0;
+      const tempId     = "t" + Date.now();
+      const itemNum    = Object.keys(cotItems).length + 1;
+      const itemNumStr = siguienteItemNum();
+      const item       = {
         id:          tempId,
+        item_num:    itemNumStr,
         codigo_item: apu.codigo_item || "",
-        descripcion: apu.descripcion || apu.codigo_item || "",
+        descripcion: apu.actividad || apu.descripcion || apu.codigo_item || "",
         unidad:      apu.unidad || "",
         precio_apu:  precio,
         cantidad:    cant,
@@ -2575,8 +2435,7 @@ function agregarLineaManualUI() {
       google.script.run
         .withSuccessHandler(res => {
           reemplazarTempIdCot(tempId, res.id);
-          // Sub-ítems del APU vienen en la misma respuesta (una sola llamada).
-          if (res.apu) insertarSubitemsFilaCot(res.id, res.apu);
+          google.script.run.actualizarItemCotizacion(res.id, { item_num: itemNumStr });
           // Cliente / dirección heredados del APU por el servidor (si estaban vacíos).
           const cli = document.getElementById("cot-cliente");
           const dir = document.getElementById("cot-direccion");
@@ -2614,6 +2473,20 @@ function agregarLineaManualUI() {
   function cerrarModalAPU(e) {
     if (!e || e.target.id === "modal-apu")
       document.getElementById("modal-apu").style.display = "none";
+  }
+
+  function siguienteItemNum() {
+    const cap    = parseInt(document.getElementById("cot-capitulo").value) || 1;
+    const prefix = cap + ".";
+    let max = 0;
+    document.querySelectorAll("#body-cuadro .crow-main td:first-child input").forEach(inp => {
+      const v = inp.value.trim();
+      if (v.startsWith(prefix)) {
+        const n = parseInt(v.slice(prefix.length));
+        if (!isNaN(n) && n > max) max = n;
+      }
+    });
+    return prefix + (max + 1);
   }
 
   function setCotEstado(msg) { document.getElementById("cot-estado").textContent = msg; }
@@ -2818,7 +2691,6 @@ function agregarLineaManualUI() {
     document.getElementById("tab-archivos").classList.add("active");
     document.getElementById("tab-apus").classList.remove("active");
     document.getElementById("tab-cots").classList.remove("active");
-    document.getElementById("tab-cots-cli").classList.remove("active");
     document.getElementById("btn-nuevo").style.display = "none";
     document.getElementById("v-apu").style.display  = "none";
     document.getElementById("v-cot").style.display  = "none";
@@ -3245,301 +3117,6 @@ function agregarLineaManualUI() {
   })();
 </script>
 
-<!-- ═══════════════════════════════════════════════
-     VISTA: DOCUMENTO COTIZACIÓN CLIENTE
-════════════════════════════════════════════════ -->
-<div id="v-cot-cliente" style="display:none">
-  <div class="toolbar">
-    <button class="btn btn-back" onclick="irTabCotsCliente()">← Volver</button>
-    <h2 id="cli-titulo">Documento Cliente</h2>
-    <div style="margin-left:auto;display:flex;gap:8px">
-      <button class="btn-action btn-azul" id="btn-imprimir-cli" onclick="window.print()" style="font-size:12px;padding:7px 16px">🖨 Imprimir / PDF</button>
-      <button class="btn-action btn-verde" id="btn-export-cli" onclick="exportarClienteXlsx()" style="font-size:12px;padding:7px 16px">⬇ Guardar .xlsx</button>
-    </div>
-  </div>
-
-  <!-- Documento imprimible -->
-  <div id="cli-doc" style="background:#fff;max-width:860px;margin:20px auto;padding:32px 40px;box-shadow:0 2px 12px rgba(0,0,0,.12);font-family:'Segoe UI',Arial,sans-serif;font-size:13px">
-
-    <!-- Membrete -->
-    <div style="border-bottom:3px solid #1a237e;padding-bottom:14px;margin-bottom:18px">
-      <div id="cli-empresa" style="font-size:18px;font-weight:700;color:#1a237e"></div>
-      <div id="cli-datos-empresa" style="font-size:11px;color:#555;margin-top:2px"></div>
-      <div style="display:flex;justify-content:space-between;margin-top:10px">
-        <div></div>
-        <div style="text-align:right">
-          <div id="cli-oferta" style="font-size:14px;font-weight:700;color:#1a237e"></div>
-          <div id="cli-fecha" style="font-size:11px;color:#555"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Destinatario -->
-    <div style="margin-bottom:18px">
-      <div><strong>Señores:</strong> <span id="cli-cliente"></span></div>
-      <div id="cli-direccion-wrap" style="display:none"><strong>Dirección:</strong> <span id="cli-direccion"></span></div>
-    </div>
-    <p style="margin-bottom:18px;color:#333">Por medio de la presente nos permitimos presentar nuestra oferta de precios para la ejecución de las siguientes actividades:</p>
-
-    <!-- Tabla de ítems -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:6px" id="cli-tabla">
-      <thead>
-        <tr style="background:#1a237e;color:#fff;font-size:12px">
-          <th style="width:52px;padding:7px 8px;text-align:center">ÍTEM</th>
-          <th style="padding:7px 8px;text-align:left">DESCRIPCIÓN</th>
-          <th style="width:55px;padding:7px 8px;text-align:center">UND</th>
-          <th style="width:70px;padding:7px 8px;text-align:right">CANT</th>
-          <th style="width:120px;padding:7px 8px;text-align:right">VR. UNITARIO</th>
-          <th style="width:120px;padding:7px 8px;text-align:right">VR. TOTAL</th>
-          <th class="no-print" style="width:28px"></th>
-        </tr>
-      </thead>
-      <tbody id="cli-tbody"></tbody>
-    </table>
-    <button class="btn-add no-print" onclick="agregarFilaCliente()" style="margin-bottom:16px">+ Agregar fila</button>
-
-    <!-- Totales -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
-      <table style="font-size:12px;border-collapse:collapse;min-width:300px">
-        <tr><td style="padding:4px 12px;color:#555">COSTO DIRECTO</td><td style="padding:4px 8px;text-align:right;font-weight:600" id="cli-cd">$ 0</td></tr>
-        <tr><td style="padding:4px 12px;color:#555">ADMINISTRACIÓN (<span id="cli-adm-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-adm-val">$ 0</td></tr>
-        <tr><td style="padding:4px 12px;color:#555">IMPREVISTOS (<span id="cli-imp-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-imp-val">$ 0</td></tr>
-        <tr><td style="padding:4px 12px;color:#555">UTILIDAD (<span id="cli-utl-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-utl-val">$ 0</td></tr>
-        <tr><td style="padding:4px 12px;color:#555">SUBTOTAL SIN IVA</td><td style="padding:4px 8px;text-align:right" id="cli-sin-iva">$ 0</td></tr>
-        <tr><td style="padding:4px 12px;color:#555">IVA (<span id="cli-iva-pct-lbl">0</span>%)</td><td style="padding:4px 8px;text-align:right" id="cli-iva-val">$ 0</td></tr>
-        <tr style="background:#e8eaf6;font-weight:700">
-          <td style="padding:7px 12px">VALOR TOTAL OFERTA</td>
-          <td style="padding:7px 8px;text-align:right;color:#1a237e;font-size:14px" id="cli-total">$ 0</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- Condiciones comerciales -->
-    <div id="cli-condiciones" style="font-size:12px;border-top:1px solid #ddd;padding-top:14px;margin-bottom:20px;display:grid;grid-template-columns:160px 1fr;gap:6px 12px;color:#333">
-      <!-- filled by JS -->
-    </div>
-
-    <!-- Cierre -->
-    <div style="border-top:1px solid #ddd;padding-top:18px;font-size:12px;color:#333">
-      <p style="margin-bottom:24px">Quedamos atentos a sus consultas. &nbsp; Cordialmente,</p>
-      <div id="cli-firmante-nombre" style="font-weight:700"></div>
-      <div id="cli-firmante-cargo" style="color:#555"></div>
-      <div id="cli-firmante-empresa" style="color:#555"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ═══ DOCUMENTO COTIZACIÓN CLIENTE ════════════════════════════════════════════
-let cliActual   = null;  // { cot, items, cfg }
-let cliCotId    = null;
-let cliFilas    = {};    // { id: { cant, precio, total } }
-
-function abrirDocCliente(cotId) {
-  cliCotId  = cotId;
-  cliFilas  = {};
-  document.getElementById("v-lista").style.display       = "none";
-  document.getElementById("v-cot").style.display         = "none";
-  document.getElementById("v-cot-cliente").style.display = "";
-  document.getElementById("cli-tbody").innerHTML         = '<tr><td colspan="7" style="padding:14px;color:#999;text-align:center">Cargando...</td></tr>';
-  google.script.run
-    .withSuccessHandler(renderDocCliente)
-    .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-    .getCotizacionCliente(cotId);
-}
-
-function renderDocCliente(cot) {
-  if (!cot) {
-    document.getElementById("cli-tbody").innerHTML =
-      '<tr><td colspan="7" style="padding:18px;color:#c62828;text-align:center">No se encontró la cotización.</td></tr>';
-    showToast("No se encontró la cotización", "error");
-    return;
-  }
-  cliActual = { cot: cot, items: cot.items || [] };
-
-  // Traer datos de empresa (config) y pintar el resto cuando lleguen
-  google.script.run.withSuccessHandler(cfg => {
-    cfg = cfg || {};
-    cliActual.cfg = cfg;
-
-    // Membrete
-    document.getElementById("cli-empresa").textContent = cfg.empresa || "";
-    document.getElementById("cli-datos-empresa").textContent =
-      [cfg.nit ? "NIT: " + cfg.nit : "", cfg.telefono, cfg.email_empresa].filter(Boolean).join("  ·  ");
-    document.getElementById("cli-oferta").textContent = "OFERTA DE PRECIOS No. " + (cot.numero_oferta || "");
-    document.getElementById("cli-fecha").textContent  = "Bogotá, " + (cot.fecha
-      ? new Date(cot.fecha).toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" })
-      : "");
-    document.getElementById("cli-titulo").textContent  = "Doc. Cliente — " + (cot.cliente || "");
-    document.getElementById("cli-cliente").textContent = cot.cliente || "";
-    const dir = cot.direccion || "";
-    document.getElementById("cli-direccion-wrap").style.display = dir ? "" : "none";
-    document.getElementById("cli-direccion").textContent = dir;
-
-    // AIU labels
-    document.getElementById("cli-adm-pct-lbl").textContent = parseFloat(cot.administracion_pct) || 0;
-    document.getElementById("cli-imp-pct-lbl").textContent = parseFloat(cot.imprevistos_pct)    || 0;
-    document.getElementById("cli-utl-pct-lbl").textContent = parseFloat(cot.utilidad_pct)       || 0;
-    document.getElementById("cli-iva-pct-lbl").textContent = parseFloat(cot.iva_pct)            || 0;
-
-    // Condiciones comerciales
-    const conds = [
-      ["FORMA DE PAGO",    cot.forma_pago],
-      ["PLAZO DE ENTREGA", cot.plazo_entrega],
-      ["VALIDEZ OFERTA",   cot.validez_oferta],
-      ["NO INCLUYE",       cot.no_incluye],
-    ].filter(([, v]) => v);
-    document.getElementById("cli-condiciones").innerHTML = conds.map(([l, v]) =>
-      `<strong>${l}:</strong><span>${v}</span>`
-    ).join("") || "";
-
-    // Firmante
-    document.getElementById("cli-firmante-nombre").textContent  = cfg.nombre_remitente || "";
-    document.getElementById("cli-firmante-cargo").textContent   =
-      [cfg.cargo, cfg.tarjeta_profesional ? "T.P. No. " + cfg.tarjeta_profesional : ""].filter(Boolean).join("  ·  ");
-    document.getElementById("cli-firmante-empresa").textContent = cfg.empresa || "";
-
-    // Filas
-    document.getElementById("cli-tbody").innerHTML = "";
-    cliFilas = {};
-    (cot.items || []).forEach(item => renderFilaCliente(item));
-    recalcularTotalesCliente();
-  }).withFailureHandler(err => showToast("Error config: " + err.message, "error"))
-    .getConfig();
-}
-
-function renderFilaCliente(item) {
-  const tbody  = document.getElementById("cli-tbody");
-  const id     = item.id;
-  const cant   = parseFloat(item.cantidad)        || 0;
-  const precio = parseFloat(item.precio_apu) || 0;
-  const total  = Math.round(cant * precio);
-  cliFilas[id] = { cant, precio, total };
-
-  const tr = document.createElement("tr");
-  tr.id    = "cli-row-" + id;
-  tr.style.borderBottom = "1px solid #eee";
-  tr.innerHTML = `
-    <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${String(item.item_num||'').replace(/"/g,'&quot;')}" placeholder="1.1"
-        style="width:44px;text-align:center;font-weight:700;color:#1a237e"
-        onchange="guardarCampoCliente(${id},'item_num',this.value)"></td>
-    <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${String(item.descripcion||'').replace(/"/g,'&quot;')}" placeholder="Descripción..."
-        style="width:100%"
-        onchange="guardarCampoCliente(${id},'descripcion',this.value)"></td>
-    <td style="padding:5px 6px">
-      <input type="text" class="cell-input" value="${String(item.unidad||'').replace(/"/g,'&quot;')}" placeholder="und"
-        style="width:44px;text-align:center"
-        onchange="guardarCampoCliente(${id},'unidad',this.value)"></td>
-    <td style="padding:5px 6px">
-      <input type="number" class="cell-input" value="${cant||''}" min="0" placeholder="0"
-        style="width:58px;text-align:right"
-        onchange="cambiarCantCliente(${id},this.value)"></td>
-    <td style="padding:5px 6px">
-      <input type="number" class="cell-input" value="${precio||''}" min="0" placeholder="0"
-        style="width:100px;text-align:right"
-        onchange="cambiarPrecioCliente(${id},this.value)"></td>
-    <td style="padding:5px 8px;text-align:right;font-weight:600" id="cli-vp-${id}">${COP(total)}</td>
-    <td class="no-print" style="padding:3px">
-      <button class="btn-del" onclick="eliminarFilaCliente(${id})">✕</button></td>`;
-  tbody.appendChild(tr);
-}
-
-function guardarCampoCliente(id, campo, val) {
-  clearTimeout(window["cli_" + id + "_" + campo]);
-  window["cli_" + id + "_" + campo] = setTimeout(() => {
-    google.script.run.actualizarItemCotizacion(id, { [campo]: val });
-  }, 700);
-}
-
-function cambiarCantCliente(id, val) {
-  const f = cliFilas[id]; if (!f) return;
-  f.cant  = parseFloat(val) || 0;
-  f.total = Math.round(f.cant * f.precio);
-  document.getElementById("cli-vp-" + id).textContent = COP(f.total);
-  recalcularTotalesCliente();
-  guardarCampoCliente(id, "cantidad", f.cant);
-}
-
-function cambiarPrecioCliente(id, val) {
-  const f = cliFilas[id]; if (!f) return;
-  f.precio = parseFloat(val) || 0;
-  f.total  = Math.round(f.cant * f.precio);
-  document.getElementById("cli-vp-" + id).textContent = COP(f.total);
-  recalcularTotalesCliente();
-  guardarCampoCliente(id, "precio_apu", f.precio);
-}
-
-function recalcularTotalesCliente() {
-  if (!cliActual) return;
-  const { cot } = cliActual;
-  const cd   = Object.values(cliFilas).reduce((s, f) => s + (f ? f.total : 0), 0);
-  const admP = parseFloat(cot.administracion_pct) || 0;
-  const impP = parseFloat(cot.imprevistos_pct)    || 0;
-  const utlP = parseFloat(cot.utilidad_pct)       || 0;
-  const ivaP = parseFloat(cot.iva_pct)            || 0;
-  const adm  = Math.round(cd * admP / 100);
-  const imp  = Math.round(cd * impP / 100);
-  const utl  = Math.round(cd * utlP / 100);
-  const sin  = cd + adm + imp + utl;
-  const iva  = Math.round(sin * ivaP / 100);
-  const tot  = sin + iva;
-  document.getElementById("cli-cd").textContent      = COP(cd);
-  document.getElementById("cli-adm-val").textContent = COP(adm);
-  document.getElementById("cli-imp-val").textContent = COP(imp);
-  document.getElementById("cli-utl-val").textContent = COP(utl);
-  document.getElementById("cli-sin-iva").textContent = COP(sin);
-  document.getElementById("cli-iva-val").textContent = COP(iva);
-  document.getElementById("cli-total").textContent   = COP(tot);
-}
-
-function agregarFilaCliente() {
-  if (!cliCotId) return;
-  google.script.run
-    .withSuccessHandler(res => {
-      if (!res || !res.id) return;
-      const blankItem = { id: res.id, item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_apu: 0 };
-      renderFilaCliente(blankItem);
-      recalcularTotalesCliente();
-      const row = document.getElementById("cli-row-" + res.id);
-      if (row) setTimeout(() => row.querySelector("input").focus(), 50);
-    })
-    .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-    .agregarLineaManual(cliCotId, { item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_apu: 0 });
-}
-
-function eliminarFilaCliente(id) {
-  showConfirm("¿Eliminar esta fila?", () => {
-    const row = document.getElementById("cli-row-" + id);
-    if (row) row.remove();
-    delete cliFilas[id];
-    recalcularTotalesCliente();
-    google.script.run.eliminarItemCotizacion(id);
-  }, "Eliminar");
-}
-
-function exportarClienteXlsx() {
-  if (!cliCotId) return;
-  btnSetEstado("btn-export-cli", "loading", "Generando...");
-  google.script.run
-    .withSuccessHandler(res => {
-      if (res && res.ok) {
-        btnSetEstado("btn-export-cli", "success", "✓ Guardado");
-        showToast("Guardado en Drive: " + res.nombre, "success");
-        setTimeout(() => btnSetEstado("btn-export-cli", "", "⬇ Guardar .xlsx"), 3000);
-      } else {
-        btnSetEstado("btn-export-cli", "error", "✕ Error");
-        showToast("Error: " + (res && res.error ? res.error : "desconocido"), "error");
-      }
-    })
-    .withFailureHandler(err => {
-      btnSetEstado("btn-export-cli", "error", "✕ Error");
-      showToast("Error: " + err.message, "error");
-    })
-    .exportarClienteXlsxV2(cliCotId);
-}
-</script>
 
 </body>
 </html>
