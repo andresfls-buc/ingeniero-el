@@ -842,7 +842,7 @@ function actualizarCotizacion(cotId, datos) {
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == cotId) {
-      const campos = ["cliente","direccion","administracion_pct","imprevistos_pct","utilidad_pct","iva_pct","aprobada","notas","forma_pago","plazo_entrega","validez_oferta","no_incluye"];
+      const campos = ["cliente","direccion","administracion_pct","imprevistos_pct","utilidad_pct","iva_pct","aprobada","notas","forma_pago","plazo_entrega","validez_oferta","no_incluye","objeto"];
       campos.forEach(campo => {
         if (datos[campo] !== undefined) {
           const col = h.indexOf(campo);
@@ -1451,4 +1451,45 @@ function _prepararCotizacion(cotId, tipo) {
     return { cot: getCotizacionCompleta(cotId), render: llenarHojaCotizacion };
   }
   return { cot: getCotizacionCliente(cotId), render: llenarHojaCotizacionCliente };
+}
+
+
+// Genera un .xlsx del documento del cliente desde la fuente única y lo guarda en Drive.
+// Reusa el render limpio llenarHojaCotizacionCliente (sin desglose interno).
+function exportarClienteXlsxV2(cotId) {
+  try {
+    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    const cot = getCotizacionCliente(cotId);
+    if (!cot) return { ok: false, error: "Cotización no encontrada" };
+
+    // Hoja temporal con el documento renderizado
+    const tmpName = "_cot_xlsx_tmp_";
+    let tmp = ss.getSheetByName(tmpName);
+    if (tmp) ss.deleteSheet(tmp);
+    tmp = ss.insertSheet(tmpName);
+    llenarHojaCotizacionCliente(tmp, cot);
+    SpreadsheetApp.flush();
+
+    // Exportar SOLO esa hoja como xlsx
+    const exportUrl = "https://docs.google.com/spreadsheets/d/" + ss.getId()
+      + "/export?format=xlsx&gid=" + tmp.getSheetId();
+    const blob = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }
+    }).getBlob().setName("Cotizacion_" + (cot.numero_oferta || cotId) + ".xlsx");
+
+    ss.deleteSheet(tmp);
+
+    // Guardar en la carpeta de Drive configurada (o raíz si no hay)
+    const cfg       = getConfig();
+    const carpetaId = (cfg["carpeta_cotizaciones_cliente"] || "").trim();
+    let archivo;
+    if (carpetaId) {
+      archivo = DriveApp.getFolderById(carpetaId).createFile(blob);
+    } else {
+      archivo = DriveApp.createFile(blob);
+    }
+    return { ok: true, nombre: archivo.getName(), url: archivo.getUrl() };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
