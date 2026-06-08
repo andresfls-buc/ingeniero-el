@@ -3342,104 +3342,77 @@ function abrirDocCliente(cotId) {
   document.getElementById("v-cot").style.display         = "none";
   document.getElementById("v-cot-cliente").style.display = "";
   document.getElementById("cli-tbody").innerHTML         = '<tr><td colspan="7" style="padding:14px;color:#999;text-align:center">Cargando...</td></tr>';
-  // Si el doc cliente está vacío, auto-poblar desde APUs de la cotización interna
   google.script.run
-    .withSuccessHandler(() => {
-      google.script.run
-        .withSuccessHandler(renderDocCliente)
-        .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-        .getCotizacionClienteDoc(cotId);
-    })
+    .withSuccessHandler(renderDocCliente)
     .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-    .inicializarClienteDesdeAPUs(cotId);
+    .getCotizacionCliente(cotId);
 }
 
-function renderDocCliente(docRaw) {
-  console.log("DIAG renderDocCliente: tipo recibido =", typeof docRaw, "| valor crudo =", docRaw, "| cliCotId =", cliCotId);
-  // El backend ahora devuelve un STRING JSON. Si llega null/no-string, lo mostramos tal cual.
-  if (docRaw === null || docRaw === undefined) {
+function renderDocCliente(cot) {
+  if (!cot) {
     document.getElementById("cli-tbody").innerHTML =
-      '<tr><td colspan="7" style="padding:18px;text-align:left;color:#c62828;font-family:monospace;font-size:11px">' +
-      'El servidor devolvió <b>' + String(docRaw) + '</b> (tipo ' + (typeof docRaw) + ') — la función NO está entregando datos.<br>' +
-      'cliCotId = ' + cliCotId + '</td></tr>';
-    showToast("Servidor devolvió " + String(docRaw), "error");
+      '<tr><td colspan="7" style="padding:18px;color:#c62828;text-align:center">No se encontró la cotización.</td></tr>';
+    showToast("No se encontró la cotización", "error");
     return;
   }
-  let doc;
-  try { doc = (typeof docRaw === "string") ? JSON.parse(docRaw) : docRaw; }
-  catch (e) {
-    document.getElementById("cli-tbody").innerHTML =
-      '<tr><td colspan="7" style="padding:18px;color:#c62828;font-family:monospace;font-size:11px">No se pudo parsear: ' + docRaw + '</td></tr>';
-    return;
-  }
-  if (doc.__diag || doc.encontrada === false) {
-    const d = doc;
-    document.getElementById("cli-tbody").innerHTML =
-      '<tr><td colspan="7" style="padding:18px;text-align:left;color:#c62828;font-family:monospace;font-size:11px">' +
-      'getCotizacionClienteDoc diagnóstico:<br>' +
-      (d.error ? ('• ERROR: <b>' + d.error + '</b><br>• stack: ' + d.stack + '<br>') : '') +
-      '• id recibido: <b>' + JSON.stringify(d.cotIdRecibido) + '</b> (tipo ' + d.tipoCotId + ')<br>' +
-      '• spreadsheet: <b>' + (d.spreadsheetNombre || '?') + '</b> (id ' + (d.spreadsheetId || '?') + ')<br>' +
-      '• hoja Cotizaciones: ' + (d.sheetCotizaciones || '?') + ', filas: ' + d.totalFilas + '<br>' +
-      '• ids que ve en la hoja: ' + JSON.stringify(d.idsEnHoja) + '<br>' +
-      '• headers: ' + JSON.stringify(d.headers) +
-      '</td></tr>';
-    showToast("Diagnóstico mostrado en la tabla", "error");
-    return;
-  }
-  cliActual = doc;
-  const { cot, items, cfg } = doc;
+  cliActual = { cot: cot, items: cot.items || [] };
 
-  // Membrete
-  document.getElementById("cli-empresa").textContent      = cfg.empresa || "";
-  document.getElementById("cli-datos-empresa").textContent =
-    [cfg.nit ? "NIT: " + cfg.nit : "", cfg.telefono, cfg.email_empresa].filter(Boolean).join("  ·  ");
-  document.getElementById("cli-oferta").textContent = "OFERTA DE PRECIOS No. " + (cot.numero_oferta || "");
-  document.getElementById("cli-fecha").textContent  = "Bogotá, " + (cot.fecha
-    ? new Date(cot.fecha).toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" })
-    : "");
-  document.getElementById("cli-titulo").textContent  = "Doc. Cliente — " + (cot.cliente || "");
-  document.getElementById("cli-cliente").textContent = cot.cliente || "";
-  const dir = cot.direccion || "";
-  document.getElementById("cli-direccion-wrap").style.display = dir ? "" : "none";
-  document.getElementById("cli-direccion").textContent = dir;
+  // Traer datos de empresa (config) y pintar el resto cuando lleguen
+  google.script.run.withSuccessHandler(cfg => {
+    cfg = cfg || {};
+    cliActual.cfg = cfg;
 
-  // AIU labels
-  document.getElementById("cli-adm-pct-lbl").textContent = parseFloat(cot.administracion_pct) || 0;
-  document.getElementById("cli-imp-pct-lbl").textContent = parseFloat(cot.imprevistos_pct)    || 0;
-  document.getElementById("cli-utl-pct-lbl").textContent = parseFloat(cot.utilidad_pct)       || 0;
-  document.getElementById("cli-iva-pct-lbl").textContent = parseFloat(cot.iva_pct)            || 0;
+    // Membrete
+    document.getElementById("cli-empresa").textContent = cfg.empresa || "";
+    document.getElementById("cli-datos-empresa").textContent =
+      [cfg.nit ? "NIT: " + cfg.nit : "", cfg.telefono, cfg.email_empresa].filter(Boolean).join("  ·  ");
+    document.getElementById("cli-oferta").textContent = "OFERTA DE PRECIOS No. " + (cot.numero_oferta || "");
+    document.getElementById("cli-fecha").textContent  = "Bogotá, " + (cot.fecha
+      ? new Date(cot.fecha).toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" })
+      : "");
+    document.getElementById("cli-titulo").textContent  = "Doc. Cliente — " + (cot.cliente || "");
+    document.getElementById("cli-cliente").textContent = cot.cliente || "";
+    const dir = cot.direccion || "";
+    document.getElementById("cli-direccion-wrap").style.display = dir ? "" : "none";
+    document.getElementById("cli-direccion").textContent = dir;
 
-  // Condiciones comerciales
-  const conds = [
-    ["FORMA DE PAGO",    cot.forma_pago],
-    ["PLAZO DE ENTREGA", cot.plazo_entrega],
-    ["VALIDEZ OFERTA",   cot.validez_oferta],
-    ["NO INCLUYE",       cot.no_incluye],
-  ].filter(([, v]) => v);
-  document.getElementById("cli-condiciones").innerHTML = conds.map(([l, v]) =>
-    `<strong>${l}:</strong><span>${v}</span>`
-  ).join("") || "";
+    // AIU labels
+    document.getElementById("cli-adm-pct-lbl").textContent = parseFloat(cot.administracion_pct) || 0;
+    document.getElementById("cli-imp-pct-lbl").textContent = parseFloat(cot.imprevistos_pct)    || 0;
+    document.getElementById("cli-utl-pct-lbl").textContent = parseFloat(cot.utilidad_pct)       || 0;
+    document.getElementById("cli-iva-pct-lbl").textContent = parseFloat(cot.iva_pct)            || 0;
 
-  // Firmante
-  document.getElementById("cli-firmante-nombre").textContent  = cfg.nombre_remitente || "";
-  document.getElementById("cli-firmante-cargo").textContent   =
-    [cfg.cargo, cfg.tarjeta_profesional ? "T.P. No. " + cfg.tarjeta_profesional : ""].filter(Boolean).join("  ·  ");
-  document.getElementById("cli-firmante-empresa").textContent = cfg.empresa || "";
+    // Condiciones comerciales
+    const conds = [
+      ["FORMA DE PAGO",    cot.forma_pago],
+      ["PLAZO DE ENTREGA", cot.plazo_entrega],
+      ["VALIDEZ OFERTA",   cot.validez_oferta],
+      ["NO INCLUYE",       cot.no_incluye],
+    ].filter(([, v]) => v);
+    document.getElementById("cli-condiciones").innerHTML = conds.map(([l, v]) =>
+      `<strong>${l}:</strong><span>${v}</span>`
+    ).join("") || "";
 
-  // Filas
-  const tbody = document.getElementById("cli-tbody");
-  tbody.innerHTML = "";
-  cliFilas = {};
-  (items || []).forEach(item => renderFilaCliente(item));
-  recalcularTotalesCliente();
+    // Firmante
+    document.getElementById("cli-firmante-nombre").textContent  = cfg.nombre_remitente || "";
+    document.getElementById("cli-firmante-cargo").textContent   =
+      [cfg.cargo, cfg.tarjeta_profesional ? "T.P. No. " + cfg.tarjeta_profesional : ""].filter(Boolean).join("  ·  ");
+    document.getElementById("cli-firmante-empresa").textContent = cfg.empresa || "";
+
+    // Filas
+    document.getElementById("cli-tbody").innerHTML = "";
+    cliFilas = {};
+    (cot.items || []).forEach(item => renderFilaCliente(item));
+    recalcularTotalesCliente();
+  }).withFailureHandler(err => showToast("Error config: " + err.message, "error"))
+    .getConfig();
 }
 
 function renderFilaCliente(item) {
   const tbody  = document.getElementById("cli-tbody");
   const id     = item.id;
   const cant   = parseFloat(item.cantidad)        || 0;
-  const precio = parseFloat(item.precio_unitario) || 0;
+  const precio = parseFloat(item.precio_apu) || 0;
   const total  = Math.round(cant * precio);
   cliFilas[id] = { cant, precio, total };
 
@@ -3476,7 +3449,7 @@ function renderFilaCliente(item) {
 function guardarCampoCliente(id, campo, val) {
   clearTimeout(window["cli_" + id + "_" + campo]);
   window["cli_" + id + "_" + campo] = setTimeout(() => {
-    google.script.run.actualizarFilaClienteDoc(id, { [campo]: val });
+    google.script.run.actualizarItemCotizacion(id, { [campo]: val });
   }, 700);
 }
 
@@ -3495,7 +3468,7 @@ function cambiarPrecioCliente(id, val) {
   f.total  = Math.round(f.cant * f.precio);
   document.getElementById("cli-vp-" + id).textContent = COP(f.total);
   recalcularTotalesCliente();
-  guardarCampoCliente(id, "precio_unitario", f.precio);
+  guardarCampoCliente(id, "precio_apu", f.precio);
 }
 
 function recalcularTotalesCliente() {
@@ -3526,14 +3499,14 @@ function agregarFilaCliente() {
   google.script.run
     .withSuccessHandler(res => {
       if (!res || !res.id) return;
-      const blankItem = { id: res.id, item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_unitario: 0 };
+      const blankItem = { id: res.id, item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_apu: 0 };
       renderFilaCliente(blankItem);
       recalcularTotalesCliente();
       const row = document.getElementById("cli-row-" + res.id);
       if (row) setTimeout(() => row.querySelector("input").focus(), 50);
     })
     .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-    .agregarFilaClienteDoc(cliCotId);
+    .agregarLineaManual(cliCotId, { item_num: "", descripcion: "", unidad: "", cantidad: 0, precio_apu: 0 });
 }
 
 function eliminarFilaCliente(id) {
@@ -3542,7 +3515,7 @@ function eliminarFilaCliente(id) {
     if (row) row.remove();
     delete cliFilas[id];
     recalcularTotalesCliente();
-    google.script.run.eliminarFilaClienteDoc(id);
+    google.script.run.eliminarItemCotizacion(id);
   }, "Eliminar");
 }
 
@@ -3564,7 +3537,7 @@ function exportarClienteXlsx() {
       btnSetEstado("btn-export-cli", "error", "✕ Error");
       showToast("Error: " + err.message, "error");
     })
-    .exportarCotizacionClienteXlsx(cliCotId);
+    .exportarClienteXlsxV2(cliCotId);
 }
 </script>
 
