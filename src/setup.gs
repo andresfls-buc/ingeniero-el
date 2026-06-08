@@ -276,3 +276,25 @@ function setupDatabase() {
     "Ahora corre la función «formatearHojas» para aplicar el formato visual."
   );
 }
+
+// Migración V2: agrega objeto + capitulo_num + capitulo_nombre a hojas existentes.
+// Idempotente: si la columna ya existe, no hace nada. Seguro de correr varias veces.
+function migrarCotizacionV2() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let agregadas = 0;
+
+  function asegurarColumna(nombreHoja, nombreColumna) {
+    const sheet = ss.getSheetByName(nombreHoja);
+    if (!sheet) return;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.indexOf(nombreColumna) >= 0) return; // ya existe
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue(nombreColumna);
+    agregadas++;
+  }
+
+  asegurarColumna("Cotizaciones",     "objeto");
+  asegurarColumna("Cotizacion_Items", "capitulo_num");
+  asegurarColumna("Cotizacion_Items", "capitulo_nombre");
+
+  SpreadsheetApp.getUi().alert("✅ Migración V2: " + agregadas + " columna(s) agregada(s).");
+}
