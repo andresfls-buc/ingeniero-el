@@ -662,13 +662,61 @@ function getCotizacionCompleta(cotId) {
   return cot;
 }
 
+// Recalcula item_num de TODOS los ítems de una cotización como "capitulo.sufijo".
+// Agrupa por capitulo_num en el orden en que aparecen las filas; dentro de cada
+// grupo numera 1, 2, 3... Ej: cap "3" → 3.1, 3.2 · cap "4" → 4.1.
+// Si un ítem no tiene capitulo_num, usa "1".
+function renumerarCotizacion(ss, cotId) {
+  const sheet = ss.getSheetByName("Cotizacion_Items");
+  const data  = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  const h        = data[0];
+  const cIdx     = h.indexOf("cotizacion_id");
+  const numIdx   = h.indexOf("item_num");
+  const capIdx   = h.indexOf("capitulo_num");
+
+  const contadorPorCapitulo = {}; // { "3": 2, "4": 1 }
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][cIdx] != cotId) continue;
+    let cap = capIdx >= 0 ? String(data[i][capIdx] || "").trim() : "";
+    if (!cap) cap = "1";
+    contadorPorCapitulo[cap] = (contadorPorCapitulo[cap] || 0) + 1;
+    const nuevoNum = cap + "." + contadorPorCapitulo[cap];
+    sheet.getRange(i + 1, numIdx + 1).setValue(nuevoNum);
+  }
+}
+
+// Cambia el capitulo_num y/o capitulo_nombre de un ítem y renumera la cotización.
+function asignarCapituloItem(itemId, capituloNum, capituloNombre) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Cotizacion_Items");
+  const data  = sheet.getDataRange().getValues();
+  const h      = data[0];
+  const capIdx = h.indexOf("capitulo_num");
+  const nomIdx = h.indexOf("capitulo_nombre");
+  const cIdx   = h.indexOf("cotizacion_id");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == itemId) {
+      const cotId = data[i][cIdx];
+      if (capituloNum !== undefined && capIdx >= 0) {
+        sheet.getRange(i + 1, capIdx + 1).setValue(String(capituloNum || "1").trim() || "1");
+      }
+      if (capituloNombre !== undefined && nomIdx >= 0) {
+        sheet.getRange(i + 1, nomIdx + 1).setValue(String(capituloNombre || "").trim());
+      }
+      renumerarCotizacion(ss, cotId);
+      return { ok: true };
+    }
+  }
+  return { ok: false };
+}
+
 // ─── AGREGAR APU A COTIZACIÓN ─────────────────────────────────────────────────
 
-function agregarAPUaCotizacion(cotId, apuId, cantidad) {
+function agregarAPUaCotizacion(cotId, apuId, cantidad, capituloNum, capituloNombre) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // APU completo, leído de la hoja (no del frontend): incluye cliente, direccion
-  // y los sub-ítems (equipos/materiales/mano_obra/otros).
   const apu = getAPUCompleto(apuId);
   if (!apu) return { ok: false };
 
@@ -677,26 +725,28 @@ function agregarAPUaCotizacion(cotId, apuId, cantidad) {
   const lastId = data.length > 1
     ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
     : 0;
-  const newId   = lastId + 1;
-  const itemNum = data.length > 1
-    ? data.slice(1).filter(r => r[1] == cotId).length + 1
-    : 1;
+  const newId  = lastId + 1;
 
   const cant      = parseFloat(cantidad) || 1;
   const precioAPU = parseFloat(apu.costo_neto) || 0;
   const valTotal  = cant * precioAPU;
+  const cap       = String(capituloNum || "1").trim() || "1";
+  const capNom    = String(capituloNombre || "").trim();
 
+  // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion,
+  // unidad, cantidad, precio_apu, valor_total, capitulo_num, capitulo_nombre
   sheet.appendRow([
-    newId, cotId, apuId, itemNum,
+    newId, cotId, apuId, "",            // item_num se asigna en renumerarCotizacion
     apu.descripcion || apu.codigo_item || "",
     apu.unidad || "",
-    cant, precioAPU, valTotal
+    cant, precioAPU, valTotal,
+    cap, capNom
   ]);
 
-  // Heredar cliente / dirección del APU hacia la cotización si aún están vacíos.
   const datosCliente = heredarDatosClienteSiVacios(ss, cotId, apu);
-
+  renumerarCotizacion(ss, cotId);
   recalcularCotizacion(ss, cotId);
+
   return {
     id:          newId,
     valor_total: valTotal,
