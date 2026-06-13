@@ -94,19 +94,25 @@ function _generarBlobPDFApu(apuId) {
 function listarArchivosDrive() {
   const cfg = getConfig();
   const resultado = [];
+  const errores   = [];
   const carpetas = [
-    { key: "carpeta_apus",         tipo: "APU" },
+    { key: "carpeta_apus",                  tipo: "APU" },
     { key: "carpeta_cotizaciones_internas", tipo: "COT" },
   ];
   carpetas.forEach(({ key, tipo }) => {
-    const id = (cfg[key] || "").trim();
-    if (!id) return;
+    const id = _extraerDriveId(cfg[key] || "");
+    if (!id) {
+      errores.push("Falta configurar '" + key + "' en la hoja Configuracion.");
+      return;
+    }
     try {
       _recolectarArchivos(DriveApp.getFolderById(id), tipo, resultado);
-    } catch(e) {}
+    } catch(e) {
+      errores.push("Error accediendo carpeta '" + key + "': " + e.message);
+    }
   });
   resultado.sort((a, b) => (b.fecha > a.fecha ? 1 : b.fecha < a.fecha ? -1 : 0));
-  return resultado;
+  return { archivos: resultado, errores: errores };
 }
 
 function _recolectarArchivos(folder, tipo, resultado) {
@@ -133,7 +139,7 @@ function exportarAPUaDrive(apuId) {
     const { blob, apu } = result;
 
     const cfg      = getConfig();
-    const folderId = (cfg["carpeta_apus"] || "").trim();
+    const folderId = _extraerDriveId(cfg["carpeta_apus"] || "");
     if (!folderId) return { ok: false, error: "Configura 'carpeta_apus' en la hoja Configuracion con el ID de tu carpeta de Drive." };
 
     const folder   = DriveApp.getFolderById(folderId);

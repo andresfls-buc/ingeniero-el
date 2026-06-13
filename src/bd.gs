@@ -1,16 +1,24 @@
 // ─── CRUD BASE DE DATOS DE PRECIOS ───────────────────────────────────────────
 
 // Carga todos los campos de Materiales (incluye proveedor, para el panel de gestión).
+// IMPORTANTE: cada campo se fuerza a String o Number. google.script.run NO puede
+// serializar un array que contenga Dates u otros objetos: cuando falla, entrega null
+// al success handler SIN lanzar error (en consola: "Uncaught qt" desde la lib de GAS).
+// La hoja devuelve fecha_actualizacion como Date (Sheets convierte "15/05/2026"),
+// por eso este panel salía en 0 mientras el dropdown de APU (campos lean) sí cargaba.
 function cargarMaterialesBD() {
+  const aTexto = v => v instanceof Date
+    ? Utilities.formatDate(v, Session.getScriptTimeZone(), "dd/MM/yyyy")
+    : String(v == null ? "" : v);
   return sheetToObjects(SpreadsheetApp.getActiveSpreadsheet(), "Materiales").map(m => ({
-    id:                  m.id,
-    codigo:              m.codigo              || "",
-    categoria:           m.categoria           || "",
-    nombre:              m.nombre              || "",
-    unidad:              m.unidad              || "",
+    id:                  Number(m.id) || 0,
+    codigo:              aTexto(m.codigo),
+    categoria:           aTexto(m.categoria),
+    nombre:              aTexto(m.nombre),
+    unidad:              aTexto(m.unidad),
     precio_sin_iva:      parseFloat(m.precio_sin_iva) || 0,
-    proveedor:           m.proveedor           || "",
-    fecha_actualizacion: m.fecha_actualizacion || "",
+    proveedor:           aTexto(m.proveedor),
+    fecha_actualizacion: aTexto(m.fecha_actualizacion),
   }));
 }
 
@@ -87,8 +95,7 @@ function _bdConf(tipo) {
       campoValor: (col, id, d) => col === "id" ? id : (calcCampos(d)[col] ?? ""),
       campoValorUpdate: (col, _row, _h, d) => {
         if (col === "id") return undefined;
-        // El código ya no se edita desde el form (se muestra MA-<id> autogenerado).
-        // Si no viene en el payload, preservar el valor existente en la hoja.
+        // Al editar, codigo no se envía (campo readonly) → preservar valor existente.
         if (col === "codigo" && d.codigo === undefined) return undefined;
         const m = calcCampos(d);
         return m[col] !== undefined ? m[col] : undefined;

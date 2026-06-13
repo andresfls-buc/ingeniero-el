@@ -763,7 +763,6 @@
 <body>
 
 <!-- Etiqueta de versión: si NO ves este texto en la app, el navegador está cargando código viejo (deployment sin actualizar). -->
-<div style="position:fixed;bottom:6px;left:6px;z-index:9999;background:#1a237e;color:#fff;font:11px/1.4 monospace;padding:3px 8px;border-radius:4px;opacity:.85" class="no-print">BUILD 2026-06-06-D</div>
 
 <!-- ═══════════════════════════════════════════════
      VISTA: LISTA DE APUs
@@ -795,7 +794,6 @@
     <button class="btn btn-back" onclick="irTabAPUs()">← Volver</button>
     <h2 id="apu-titulo">Nuevo APU</h2>
     <span class="estado-tag" id="apu-estado"></span>
-    <button class="btn-action btn-azul" id="btn-guardar-apu" onclick="guardarAPUManual()" style="margin-left:auto;font-size:12px;padding:7px 18px">💾 Guardar APU</button>
   </div>
 
   <div class="container">
@@ -994,6 +992,9 @@
       <button class="btn-action btn-naranja" id="btn-dl-apu" onclick="descargarAPU()">
         ⬇ Descargar APU
       </button>
+      <button class="btn-action btn-azul" id="btn-guardar-apu" onclick="guardarAPUManual()">
+        Guardar APU
+      </button>
     </div>
 
   </div><!-- /container -->
@@ -1137,11 +1138,11 @@
     </div>
 
     <div class="actions-bar">
-      <button class="btn-action" id="btn-pdf-interna" onclick="descargarPDF('interna')" style="background:#607d8b;color:#fff">
-        ⬇ Descargar cotización (.xlsx)
+      <button class="btn-action" id="btn-pdf-interna" onclick="descargarYGuardarCotizacion()" style="background:#607d8b;color:#fff">
+        ⬇ Descargar y guardar en Drive
       </button>
       <button class="btn-action btn-celeste" id="btn-email" onclick="enviarPorCorreo()">
-        ✉ Enviar al cliente y guardar
+        ✉ Enviar al cliente
       </button>
     </div>
 
@@ -1236,7 +1237,7 @@
       <table class="modal-table">
         <thead>
           <tr>
-            <th>ÍTEM</th><th>CLIENTE / OBRA</th><th>ACTIVIDAD</th>
+            <th>CLIENTE / OBRA</th><th>ACTIVIDAD</th>
             <th class="num">COSTO NETO</th><th></th><th style="width:32px"></th>
           </tr>
         </thead>
@@ -1316,6 +1317,20 @@
     style: 'currency', currency: 'COP', maximumFractionDigits: 0
   }).format(v || 0);
 
+  const formatFecha = f => {
+    if (!f) return '—';
+    const s = String(f).trim();
+    // Formato colombiano dd/MM/yyyy — mostrar directo para evitar malinterpretación JS
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+    // Formato largo (Date object serializado) — parsear y reformatear
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const dia  = String(d.getDate()).padStart(2, '0');
+    const mes  = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  };
+
   // id → "001" (espejo cliente de _padId en apu.gs)
   const padId = id => {
     const n = parseInt(id);
@@ -1376,7 +1391,7 @@
         <td>${a.cliente || a.descripcion || '—'}</td>
         <td>${a.actividad || '—'}</td>
         <td class="num">${COP(a.costo_neto)}</td>
-        <td>${a.fecha || '—'}</td>
+        <td>${formatFecha(a.fecha)}</td>
         <td style="display:flex;gap:6px">
           <button class="btn-open" onclick="abrirAPU(${a.id})">Abrir →</button>
           <button class="btn-del" title="Eliminar APU" onclick="confirmarEliminarAPU(${a.id}, '${String(a.cliente || a.descripcion || '').replace(/'/g,"\\'")}')">✕</button>
@@ -1930,27 +1945,38 @@
     }
     cerrarModal();
 
+    // Capturar tipo en este momento (tipoModal es global y puede cambiar si el usuario
+    // abre otro modal antes de que el servidor responda)
+    const tipoCapturado = tipoModal;
     const tempId = "t" + Date.now();
     const item   = {
       id:                 tempId,
-      tipo:               tipoModal,
+      tipo:               tipoCapturado,
       recurso_id:         recurso.id,
       descripcion_manual: recurso.nombre,
       unidad:             recurso.unidad || "",
       precio_unitario:    recurso.precio,
       cantidad:           1,
       rendimiento:        1,
-      valor_parcial:      calcVP(tipoModal, 1, recurso.precio, 1),
+      valor_parcial:      calcVP(tipoCapturado, 1, recurso.precio, 1),
     };
-    filas[tipoModal][tempId] = { cant: 1, precio: recurso.precio, rend: 1, vp: item.valor_parcial };
-    renderFila(tipoModal, item);
+    filas[tipoCapturado][tempId] = { cant: 1, precio: recurso.precio, rend: 1, vp: item.valor_parcial };
+    renderFila(tipoCapturado, item);
     recalcularTotalesUI();
 
     google.script.run
-      .withSuccessHandler(res => reemplazarTempId(tempId, res.id, tipoModal))
+      .withSuccessHandler(res => {
+        reemplazarTempId(tempId, res.id, tipoCapturado);
+        // Si la fila desapareció del DOM (ej: renderFormulario fue llamado mientras el
+        // servidor procesaba), volver a pintarla con el id real confirmado.
+        if (!document.getElementById("row-" + res.id)) {
+          renderFila(tipoCapturado, { ...item, id: res.id, valor_parcial: res.valor_parcial });
+          recalcularTotalesUI();
+        }
+      })
       .withFailureHandler(err => showToast("Error guardando ítem: " + err.message, "error"))
       .agregarItemAPU(apuActual, {
-        tipo:               tipoModal,
+        tipo:               tipoCapturado,
         recurso_id:         recurso.id,
         descripcion_manual: recurso.nombre,
         precio_unitario:    recurso.precio,
@@ -2081,7 +2107,7 @@
       <tbody>${cots.map(c => `<tr>
         <td class="mono">${c.numero_oferta || '—'}</td>
         <td>${c.cliente || '—'}</td>
-        <td>${c.fecha || '—'}</td>
+        <td>${formatFecha(c.fecha)}</td>
         <td class="num">${COP(c.valor_total)}</td>
         <td><span class="badge ${c.aprobada === 'Sí' ? 'badge-ok' : 'badge-no'}">${c.aprobada === 'Sí' ? 'Aprobada' : 'Pendiente'}</span></td>
         <td style="display:flex;gap:6px">
@@ -2380,15 +2406,14 @@ function agregarLineaManualUI() {
 
     const tbody = document.getElementById("modal-apu-tbody");
     if (!todosLosAPUs.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#888">No hay APUs guardados. Ve al tab <strong>APUs</strong> y crea uno primero.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#888">No hay APUs guardados. Ve al tab <strong>APUs</strong> y crea uno primero.</td></tr>';
       return;
     }
     if (!filtrados.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#888">Sin resultados para esa búsqueda.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#888">Sin resultados para esa búsqueda.</td></tr>';
       return;
     }
     tbody.innerHTML = filtrados.map(a => `<tr>
-      <td class="mono">${a.codigo_item || '—'}</td>
       <td>${a.cliente || a.descripcion || '—'}</td>
       <td>${a.actividad || '—'}</td>
       <td class="num">${COP(a.costo_neto)}</td>
@@ -2512,15 +2537,15 @@ function agregarLineaManualUI() {
   }
 
   // ═══ ENVIAR COTIZACIÓN + GUARDAR PDF EN DRIVE ════════════════════════════
-  function descargarPDF(tipo) {
+  function descargarYGuardarCotizacion() {
     if (!cotActual) { showToast("Guarda la cotización primero.", "warning"); return; }
-    const btnId = tipo === "interna" ? "btn-pdf-interna" : "btn-pdf";
-    btnSetEstado(btnId, "loading", "⏳ Generando Excel...");
+    btnSetEstado("btn-pdf-interna", "loading", "⏳ Generando...");
+    setCotEstado("Generando archivo...");
     google.script.run
       .withSuccessHandler(res => {
         if (!res.ok) {
-          btnSetEstado(btnId, "error", "✕ Error al generar");
-          showToast("Error generando Excel: " + res.error, "error");
+          btnSetEstado("btn-pdf-interna", "error", "✕ Error al generar");
+          showToast("Error: " + res.error, "error");
           return;
         }
         const blob = b64toBlob(res.base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -2530,14 +2555,30 @@ function agregarLineaManualUI() {
         a.download = res.fileName;
         a.click();
         URL.revokeObjectURL(url);
-        btnSetEstado(btnId, "success", "✓ Descargado");
-        showAlert("Excel Descargado", "La cotización fue descargada exitosamente.\n" + res.fileName, "success");
+        btnSetEstado("btn-pdf-interna", "loading", "☁ Guardando en Drive...");
+        setCotEstado("Guardando en Drive...");
+        google.script.run
+          .withSuccessHandler(driveRes => {
+            if (driveRes && !driveRes.ok) {
+              btnSetEstado("btn-pdf-interna", "error", "✕ Error Drive");
+              showToast("Descargado, pero error en Drive: " + driveRes.error, "error");
+            } else {
+              btnSetEstado("btn-pdf-interna", "success", "✓ Listo");
+              setCotEstado("Descargado ✓  |  Guardado en Drive ✓");
+              showAlert("¡Completado!", "La cotización fue descargada exitosamente y guardada en Google Drive.\n" + (driveRes.nombre || ""), "success");
+            }
+          })
+          .withFailureHandler(err => {
+            btnSetEstado("btn-pdf-interna", "error", "✕ Error Drive");
+            showToast("Descargado, pero error en Drive: " + err.message, "error");
+          })
+          .exportarCotizacionPDF(cotActual.id, "cliente");
       })
       .withFailureHandler(err => {
-        btnSetEstado(btnId, "error", "✕ Error");
+        btnSetEstado("btn-pdf-interna", "error", "✕ Error");
         showToast("Error: " + err.message, "error");
       })
-      .descargarPDFBase64(cotActual.id, tipo);
+      .descargarPDFBase64(cotActual.id, "cliente");
   }
 
   function b64toBlob(b64, type) {
@@ -2551,14 +2592,14 @@ function agregarLineaManualUI() {
     if (!cotActual) { showToast("Guarda la cotización primero.", "warning"); return; }
     showPrompt("Correo electrónico del cliente:", "", "email", email => {
       if (!email || !email.includes("@")) { showToast("Correo inválido.", "warning"); return; }
-      btnSetEstado("btn-email", "loading", "⏳ Generando y enviando...");
-      setCotEstado("Generando PDF y enviando correo...");
+      btnSetEstado("btn-email", "loading", "⏳ Enviando...");
+      setCotEstado("Enviando correo al cliente...");
       google.script.run
         .withSuccessHandler(res => {
           if (res.ok) {
             btnSetEstado("btn-email", "success", "✓ Enviado");
-            setCotEstado("PDF guardado en Drive ✓  |  Correo enviado ✓");
-            showAlert("¡Enviado con éxito!", "El PDF fue guardado en Drive y el correo fue enviado exitosamente a:\n" + email, "success");
+            setCotEstado("Correo enviado ✓");
+            showAlert("¡Enviado con éxito!", "El correo fue enviado exitosamente a:\n" + email, "success");
           } else {
             btnSetEstado("btn-email", "error", "✕ Error al enviar");
             setCotEstado("Error: " + res.error);
@@ -2570,7 +2611,7 @@ function agregarLineaManualUI() {
           setCotEstado("Error: " + err.message);
           showToast("Error: " + err.message, "error");
         })
-        .enviarYGuardarPDF(cotActual.id, email);
+        .enviarCotizacionEmail(cotActual.id, email);
     });
   }
 
@@ -2702,8 +2743,13 @@ function agregarLineaManualUI() {
     const el = document.getElementById("lista-container");
     el.innerHTML = '<div class="loading">Cargando archivos de Drive...</div>';
     google.script.run
-      .withSuccessHandler(data => {
-        archivosData = data || [];
+      .withSuccessHandler(res => {
+        const errores = (res && res.errores) || [];
+        archivosData  = (res && res.archivos) || [];
+        if (errores.length) {
+          el.innerHTML = '<p class="empty" style="color:#c62828;padding:14px">⚠ ' + errores.join('<br>') + '</p>';
+          return;
+        }
         renderContenedorArchivos();
       })
       .withFailureHandler(err => {
@@ -2917,14 +2963,22 @@ function agregarLineaManualUI() {
        </div>`;
 
     if (bdTabActual === "MAT") {
-      const codDisplay = (id !== null && id !== undefined)
-        ? codigoMaterial(item.id)
-        : "se asigna al guardar";
-      fields.innerHTML = catList
+      const esNuevo = (id === null || id === undefined);
+      const codDisplay = esNuevo ? "" : codigoMaterial(item.id);
+      const codLabel   = esNuevo ? "CÓDIGO (opcional)" : "CÓDIGO";
+      const codOpts    = esNuevo ? 'list="bd-codigos-list"' : 'readonly disabled style="color:#6b7390;background:#f5f5f5"';
+
+      // Datalist con códigos existentes (combo: permite escoger o escribir uno nuevo)
+      const codigosUnicos = [...new Set(bdDatos.map(m => m.codigo).filter(Boolean))].sort();
+      const codigosDatalist = esNuevo
+        ? `<datalist id="bd-codigos-list">${codigosUnicos.map(c => `<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>`
+        : "";
+
+      fields.innerHTML = catList + codigosDatalist
         + `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;width:100%">`
         + `<div>
-             <label class="bd-edit-label">CÓDIGO</label>
-             <input class="bd-edit-input" value="${codDisplay.replace(/"/g,'&quot;')}" readonly disabled style="color:#6b7390;background:#f5f5f5">
+             <label class="bd-edit-label">${codLabel}</label>
+             <input id="bd-f-codigo" class="bd-edit-input" value="${codDisplay.replace(/"/g,'&quot;')}" ${codOpts} placeholder="${esNuevo ? 'Ej: TC1/4, ADHM...' : ''}">
            </div>`
         + inp("bd-f-categoria", "CATEGORÍA",     item.categoria || "", 'list="bd-cats"')
         + inp("bd-f-nombre",    "NOMBRE",        item.nombre    || "", "", "grid-column:span 2")
@@ -2971,8 +3025,11 @@ function agregarLineaManualUI() {
 
     if (bdTabActual === "MAT") {
       tipo  = "MATERIAL";
+      const codigoEl = document.getElementById("bd-f-codigo");
       datos = {
-        // codigo NO se envía: es MA-<id> autogenerado; el valor original se preserva en la hoja.
+        // codigo solo se envía cuando el campo es editable (material nuevo, no disabled).
+        // Para edición, se omite y el servidor preserva el valor existente en la hoja.
+        ...(codigoEl && !codigoEl.disabled ? { codigo: (codigoEl.value || "").trim() } : {}),
         categoria:     (document.getElementById("bd-f-categoria").value || "").trim(),
         nombre:        (document.getElementById("bd-f-nombre").value    || "").trim(),
         unidad:        (document.getElementById("bd-f-unidad").value    || "").trim(),

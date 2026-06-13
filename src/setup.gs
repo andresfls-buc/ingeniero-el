@@ -252,13 +252,22 @@ function setupDatabase() {
   // === CONFIGURACIÓN ===
   createSheet(ss, "Configuracion", ["clave", "valor", "descripcion"]);
   const cfg = ss.getSheetByName("Configuracion");
-  cfg.appendRow(["carpeta_cotizaciones_internas", "", "ID de la carpeta de Drive para cotizaciones internas"]);
-  cfg.appendRow(["carpeta_apus",         "", "ID de la carpeta de Drive donde se guardarán los PDFs de APUs"]);
-  cfg.appendRow(["nombre_remitente",     "", "Tu nombre completo (aparece como remitente del correo)"]);
-  cfg.appendRow(["empresa",              "", "Nombre de tu empresa o razón social"]);
-  cfg.appendRow(["logo_id",             "", "ID del archivo de logo en Google Drive (aparece en el PDF)"]);
-  cfg.appendRow(["carpeta_firma",        "", "ID de la carpeta de Drive donde se guarda la firma digital"]);
-  cfg.appendRow(["firma_id",            "", "ID del archivo de firma digital en Drive (se genera automáticamente)"]);
+  // Solo agregar la clave si NO existe ya: re-correr setup no debe duplicar filas
+  // (antes esto apilaba 7 filas por corrida y los duplicados vacíos borraban valores).
+  const cfgExistentes = cfg.getLastRow() > 1
+    ? cfg.getRange(2, 1, cfg.getLastRow() - 1, 1).getValues().map(r => String(r[0]).trim())
+    : [];
+  [
+    ["carpeta_cotizaciones_internas", "ID de la carpeta de Drive para cotizaciones internas"],
+    ["carpeta_apus",                  "ID de la carpeta de Drive donde se guardarán los PDFs de APUs"],
+    ["nombre_remitente",              "Tu nombre completo (aparece como remitente del correo)"],
+    ["empresa",                       "Nombre de tu empresa o razón social"],
+    ["logo_id",                       "ID del archivo de logo en Google Drive (aparece en el PDF)"],
+    ["carpeta_firma",                 "ID de la carpeta de Drive donde se guarda la firma digital"],
+    ["firma_id",                      "ID del archivo de firma digital en Drive (se genera automáticamente)"],
+  ].forEach(([clave, desc]) => {
+    if (!cfgExistentes.includes(clave)) cfg.appendRow([clave, "", desc]);
+  });
   // Formato de la hoja config
   cfg.setColumnWidth(1, 180);
   cfg.setColumnWidth(2, 340);

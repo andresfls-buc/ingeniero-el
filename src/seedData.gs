@@ -1091,3 +1091,47 @@ function seedManoObra(ss) {
     sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
   }
 }
+
+// ─── AUTO-INIT ────────────────────────────────────────────────────────────────
+// Llama desde google.script.run — nunca usa getUi().
+// Crea la hoja si no existe y siembra si está vacía. Si ya tiene datos, no toca nada.
+function inicializarBD() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  function _asegurarHoja(nombre, headers) {
+    let sheet = ss.getSheetByName(nombre);
+    if (!sheet) {
+      sheet = ss.insertSheet(nombre);
+      sheet.appendRow(headers);
+    }
+    return sheet;
+  }
+
+  const matSheet = _asegurarHoja("Materiales", [
+    "id","codigo","categoria","nombre","unidad",
+    "precio_sin_iva","precio_con_iva","precio_2026","proveedor","fecha_actualizacion","partida"
+  ]);
+  if (matSheet.getLastRow() < 2) {
+    seedMateriales(ss);
+    SpreadsheetApp.flush();
+  }
+
+  const eqSheet = _asegurarHoja("Equipos", ["id","nombre","tarifa_dia","partida"]);
+  if (eqSheet.getLastRow() < 2) {
+    seedEquipos(ss);
+    SpreadsheetApp.flush();
+  }
+
+  const moSheet = _asegurarHoja("ManoObra",
+    ["id","descripcion","salario_mensual","prestaciones_pct","costo_dia"]);
+  if (moSheet.getLastRow() < 2) {
+    seedManoObra(ss);
+    SpreadsheetApp.flush();
+  }
+
+  return {
+    matRows: matSheet.getLastRow(),
+    eqRows:  eqSheet.getLastRow(),
+    moRows:  moSheet.getLastRow(),
+  };
+}

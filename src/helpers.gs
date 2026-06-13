@@ -22,9 +22,42 @@ function getConfig() {
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
   const cfg  = {};
   data.forEach(([clave, valor]) => {
-    if (clave) cfg[String(clave).trim()] = String(valor || "").trim();
+    const k = String(clave || "").trim();
+    if (!k) return;
+    const v = String(valor || "").trim();
+    // Si la clave está duplicada, NUNCA dejar que una fila vacía pise un valor real.
+    if (cfg[k] === undefined || cfg[k] === "") cfg[k] = v;
   });
   return cfg;
+}
+
+// Limpieza de un solo uso: colapsa filas duplicadas de Configuracion a una por clave,
+// conservando el valor no vacío y la descripción. Correr desde el editor una vez.
+function deduplicarConfiguracion() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Configuracion");
+  if (!sheet || sheet.getLastRow() < 2) return { ok: false, error: "Hoja Configuracion vacía o inexistente." };
+
+  const lastRow = sheet.getLastRow();
+  const data    = sheet.getRange(2, 1, lastRow - 1, 3).getValues(); // clave, valor, descripcion
+  const orden   = [];
+  const map     = {};
+  data.forEach(([clave, valor, desc]) => {
+    const k = String(clave || "").trim();
+    if (!k) return;
+    const v = String(valor || "").trim();
+    const d = String(desc  || "").trim();
+    if (!map[k]) { map[k] = { valor: v, desc: d }; orden.push(k); }
+    else {
+      if (!map[k].valor && v) map[k].valor = v;   // preferir el valor no vacío
+      if (!map[k].desc  && d) map[k].desc  = d;
+    }
+  });
+
+  const filas = orden.map(k => [k, map[k].valor, map[k].desc]);
+  sheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  if (filas.length) sheet.getRange(2, 1, filas.length, 3).setValues(filas);
+  return { ok: true, filasAntes: data.length, filasDespues: filas.length, claves: orden };
 }
 
 // Escribe un objeto { clave: valor } en la hoja Configuracion.

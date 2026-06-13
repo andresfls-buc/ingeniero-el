@@ -106,13 +106,35 @@ function exportarCotizacionPDF(cotId, tipo) {
   return { ok: true, url: file.getUrl(), nombre: fileName };
 }
 
+// Acepta tanto el ID pelado como la URL completa de la carpeta de Drive.
+// (getFolderById exige SOLO el ID; pegar la URL o un sufijo ?usp=sharing lo rompe.)
+function _extraerDriveId(valor) {
+  const v = String(valor || "").trim();
+  if (!v) return "";
+  let m = v.match(/\/(?:folders|d)\/([a-zA-Z0-9_-]+)/);   // .../folders/ID  o  .../d/ID
+  if (m) return m[1];
+  m = v.match(/[?&]id=([a-zA-Z0-9_-]+)/);                 // ...?id=ID
+  if (m) return m[1];
+  return v.split(/[?#]/)[0].replace(/\/+$/, "");          // ID pelado (sin query ni "/" final)
+}
+
 function obtenerCarpetaPDF() {
-  const FOLDER_ID = (getConfig()["carpeta_cotizaciones_internas"] || "").trim();
-  if (!FOLDER_ID) throw new Error(
+  const rawFolder = (getConfig()["carpeta_cotizaciones_internas"] || "").trim();
+  if (!rawFolder) throw new Error(
     "Configura el ID de tu carpeta de Drive en la hoja 'Configuracion' → fila 'carpeta_cotizaciones_internas'. " +
     "Abre la carpeta en Drive, copia el ID del final de la URL y pégalo ahí."
   );
-  const raiz = DriveApp.getFolderById(FOLDER_ID);
+  const FOLDER_ID = _extraerDriveId(rawFolder);
+  let raiz;
+  try {
+    raiz = DriveApp.getFolderById(FOLDER_ID);
+  } catch (e) {
+    throw new Error(
+      "No pude abrir la carpeta de Drive con el ID '" + FOLDER_ID + "'. Revisa que en 'Configuracion' → " +
+      "'carpeta_cotizaciones_internas' esté el ID (o la URL) correcto de una carpeta a la que tengas acceso. " +
+      "Detalle: " + e.message
+    );
+  }
 
   const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -562,6 +584,13 @@ function crearCotizacion(datos) {
     datos.no_incluye     || "",
   ]);
 
+  // Guardar la fecha como TEXTO (formato "@") para que Sheets no la convierta en Date
+  // y se corra un día al leerla. Queda fija exactamente como "dd/MM/yyyy".
+  const fechaCol = data[0].indexOf("fecha") + 1;
+  if (fechaCol > 0) {
+    sheet.getRange(sheet.getLastRow(), fechaCol).setNumberFormat("@").setValue(fecha);
+  }
+
   return { id: newId, numero_oferta: numero };
 }
 
@@ -737,7 +766,7 @@ function agregarAPUaCotizacion(cotId, apuId, cantidad, capituloNum, capituloNomb
   // unidad, cantidad, precio_apu, valor_total, capitulo_num, capitulo_nombre
   sheet.appendRow([
     newId, cotId, apuId, "",            // item_num se asigna en renumerarCotizacion
-    apu.descripcion || apu.codigo_item || "",
+    apu.actividad || apu.descripcion || apu.codigo_item || "",
     apu.unidad || "",
     cant, precioAPU, valTotal,
     cap, capNom
@@ -843,10 +872,17 @@ function actualizarCotizacion(cotId, datos) {
   for (let i = 1; i < data.length; i++) {
     if (data[i][0] == cotId) {
       const campos = ["cliente","direccion","administracion_pct","imprevistos_pct","utilidad_pct","iva_pct","aprobada","notas","forma_pago","plazo_entrega","validez_oferta","no_incluye","objeto"];
+      // Campos de texto libre: forzar formato "@" (texto) ANTES de escribir, para que
+      // Sheets NO convierta "5 %" → 0.05 ni "05/12/2026" → Date al guardar.
+      const camposTexto = ["cliente","direccion","aprobada","notas","forma_pago","plazo_entrega","validez_oferta","no_incluye","objeto"];
       campos.forEach(campo => {
         if (datos[campo] !== undefined) {
           const col = h.indexOf(campo);
-          if (col >= 0) sheet.getRange(i + 1, col + 1).setValue(datos[campo]);
+          if (col >= 0) {
+            const cell = sheet.getRange(i + 1, col + 1);
+            if (camposTexto.includes(campo)) cell.setNumberFormat("@");
+            cell.setValue(datos[campo]);
+          }
         }
       });
       recalcularCotizacion(ss, cotId);
@@ -1135,6 +1171,12 @@ function getCotizacionCliente(cotId) {
 
   const cot = {};
   cotH.forEach((h, i) => cot[h] = cotRow[i]);
+
+  // La columna fecha vuelve como Date (Sheets convierte el string al guardar):
+  // formatear a texto limpio para no imprimir "Sat Dec 05 2026 10:00:00 GMT...".
+  if (cot.fecha instanceof Date) {
+    cot.fecha = Utilities.formatDate(cot.fecha, Session.getScriptTimeZone(), "dd/MM/yyyy");
+  }
 
   // Normalizar % guardados como decimal (0.5 → 50)
   ["administracion_pct", "imprevistos_pct", "utilidad_pct", "iva_pct"].forEach(k => {
@@ -1479,9 +1521,9 @@ function exportarClienteXlsxV2(cotId) {
 
     ss.deleteSheet(tmp);
 
-    // Guardar en la carpeta de Drive configurada (o raíz si no hay)
-    const cfg       = getConfig();
-    const carpetaId = (cfg["carpeta_cotizaciones_cliente"] || "").trim();
+    // Guardar en carpeta_cotizaciones_internas (misma carpeta que los PDFs)
+    const cfg        = getConfig();
+    const carpetaId  = (cfg["carpeta_cotizaciones_internas"] || "").trim();
     let archivo;
     if (carpetaId) {
       archivo = DriveApp.getFolderById(carpetaId).createFile(blob);
