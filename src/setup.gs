@@ -274,10 +274,9 @@ function setupDatabase() {
   cfg.setColumnWidth(3, 420);
   cfg.getRange(2, 3, 2, 1).setFontColor("#9e9e9e").setFontStyle("italic");
 
-  seedMateriales(ss);
-  SpreadsheetApp.flush();
-  seedManoObra(ss);
-  seedEquipos(ss);
+  if (ss.getSheetByName("Materiales").getLastRow() < 2) { seedMateriales(ss); SpreadsheetApp.flush(); }
+  if (ss.getSheetByName("ManoObra").getLastRow()   < 2) { seedManoObra(ss);   SpreadsheetApp.flush(); }
+  if (ss.getSheetByName("Equipos").getLastRow()     < 2) { seedEquipos(ss); }
   SpreadsheetApp.flush();
 
   SpreadsheetApp.getUi().alert(
