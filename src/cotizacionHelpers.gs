@@ -19,3 +19,37 @@ function compararItemNum(a, b) {
   }
   return 0;
 }
+
+// Fórmula ÚNICA de totales de una cotización. La usan el servidor
+// (recalcularCotizacion), el documento del cliente (llenarHojaCotizacionCliente)
+// y el frontend (recalcularTotalCot) para que lista, web y PDF muestren SIEMPRE
+// el mismo número.
+//
+// Regla (igual a la del documento que recibe el cliente): se redondea CADA
+// componente del AIU antes de sumarlos, luego el IVA se aplica sobre neto+AIU.
+// pcts: { administracion_pct, imprevistos_pct, utilidad_pct, iva_pct }
+function calcularTotalesCotizacion(neto, pcts) {
+  pcts = pcts || {};
+  var n       = parseFloat(neto) || 0;
+  var admPct  = parseFloat(pcts.administracion_pct) || 0;
+  var impPct  = parseFloat(pcts.imprevistos_pct)    || 0;
+  var utilPct = parseFloat(pcts.utilidad_pct)       || 0;
+  var ivaPct  = parseFloat(pcts.iva_pct)            || 0;
+
+  var admVal  = Math.round(n * admPct  / 100);
+  var impVal  = Math.round(n * impPct  / 100);
+  var utilVal = Math.round(n * utilPct / 100);
+  var sinIVA  = n + admVal + impVal + utilVal;
+  var ivaVal  = Math.round(sinIVA * ivaPct / 100);
+  var total   = sinIVA + ivaVal;
+
+  return {
+    neto:    Math.round(n),
+    admVal:  admVal,
+    impVal:  impVal,
+    utilVal: utilVal,
+    sinIVA:  sinIVA,
+    ivaVal:  ivaVal,
+    total:   total,
+  };
+}

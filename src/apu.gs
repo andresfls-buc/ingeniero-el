@@ -620,13 +620,16 @@ function reconstruirAPUsDesdeItems() {
 function crearAPU(datos) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("APU");
+  const fecha = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+
+  // Sección crítica: leer max id + append DEBE ser atómico para no duplicar ids.
+  return withLock(() => {
   const data  = sheet.getDataRange().getValues();
   const headers = data[0];
   const lastId = data.length > 1
     ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
     : 0;
   const newId = lastId + 1;
-  const fecha = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
   const valores = {
     id:                    newId,
@@ -651,7 +654,9 @@ function crearAPU(datos) {
     herramienta_menor_pct: 0,
   };
   sheet.appendRow(headers.map(h => valores[h] !== undefined ? valores[h] : ""));
+  SpreadsheetApp.flush();
   return newId;
+  });
 }
 
 // ─── ACTUALIZAR CABEZA DEL APU ────────────────────────────────────────────────
@@ -761,11 +766,6 @@ function getAPUCompleto(apuId) {
 function agregarItemAPU(apuId, item) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("APU_Items");
-  const data  = sheet.getDataRange().getValues();
-  const lastId = data.length > 1
-    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
-    : 0;
-  const newId = lastId + 1;
 
   const cant    = parseFloat(item.cantidad)        || 0;
   const precio  = parseFloat(item.precio_unitario) || 0;
@@ -773,12 +773,22 @@ function agregarItemAPU(apuId, item) {
   const vp      = calcularValorParcial(item.tipo, cant, precio, rend);
   const partida = getPartidaRecurso(ss, item.tipo, item.recurso_id || "");
 
-  sheet.appendRow([
-    newId, apuId, item.tipo,
-    item.recurso_id         || "",
-    item.descripcion_manual || "",
-    cant, rend, precio, vp, partida
-  ]);
+  // Sección crítica: leer max id + append DEBE ser atómico para no duplicar ids.
+  const newId = withLock(() => {
+    const data   = sheet.getDataRange().getValues();
+    const lastId = data.length > 1
+      ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+      : 0;
+    const id = lastId + 1;
+    sheet.appendRow([
+      id, apuId, item.tipo,
+      item.recurso_id         || "",
+      item.descripcion_manual || "",
+      cant, rend, precio, vp, partida
+    ]);
+    SpreadsheetApp.flush();
+    return id;
+  });
 
   recalcularSubtotales(ss, apuId);
   return { id: newId, valor_parcial: vp };

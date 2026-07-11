@@ -1,3 +1,18 @@
+// Serializa una sección crítica que genera IDs (max+1) y escribe filas.
+// SIN esto, dos llamadas concurrentes (ej: agregar varios APUs seguidos) leen el
+// mismo max y asignan el MISMO id a dos filas → filas duplicadas/colisionadas que
+// luego "desaparecen" al descargar y descuadran los totales. Con el lock, la
+// segunda llamada espera a que la primera termine de escribir.
+function withLock(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // espera hasta 30s por el turno
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function createSheet(ss, name, headers) {
   let sheet = ss.getSheetByName(name);
 

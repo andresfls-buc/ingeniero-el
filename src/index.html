@@ -1017,7 +1017,7 @@
         <span>CUADRO DE COTIZACIÓN</span>
         <div style="display:flex;align-items:center;gap:6px">
           <label style="font-size:11px;color:#cfd8dc;white-space:nowrap">Cap. #</label>
-          <input type="number" id="cot-capitulo" min="1" value="1" style="width:44px;text-align:center;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:3px 4px;font-size:12px;background:rgba(255,255,255,0.12);color:#fff">
+          <input type="number" id="cot-capitulo" min="1" value="1" oninput="renumerarCuadroCot()" style="width:44px;text-align:center;border:1px solid rgba(255,255,255,0.3);border-radius:3px;padding:3px 4px;font-size:12px;background:rgba(255,255,255,0.12);color:#fff">
           <button class="btn-add" onclick="abrirSeleccionAPU()">+ Agregar APU</button>
         </div>
       </div>
@@ -1051,22 +1051,22 @@
         </div>
         <div class="total-row">
           <span class="label">ADMINISTRACIÓN</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-adm-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-adm-pct" type="number" min="0" max="100" step="0.5" value="0" oninput="recalcularTotalCot()" onblur="guardarAIUCot()"> %</span>
           <span class="total-val" id="cot-adm-val">$ 0</span>
         </div>
         <div class="total-row">
           <span class="label">IMPREVISTOS</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-imp-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-imp-pct" type="number" min="0" max="100" step="0.5" value="0" oninput="recalcularTotalCot()" onblur="guardarAIUCot()"> %</span>
           <span class="total-val" id="cot-imp-val">$ 0</span>
         </div>
         <div class="total-row">
           <span class="label">UTILIDAD</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-util-pct" type="number" min="0" max="100" step="0.5" value="0" onchange="guardarAIUCot()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-util-pct" type="number" min="0" max="100" step="0.5" value="0" oninput="recalcularTotalCot()" onblur="guardarAIUCot()"> %</span>
           <span class="total-val" id="cot-util-val">$ 0</span>
         </div>
         <div class="total-row">
           <span class="label">IVA</span>
-          <span class="pct-wrap"><input class="pct-input" id="cot-iva-pct" type="number" min="0" max="100" step="0.5" value="19" onchange="guardarAIUCot()"> %</span>
+          <span class="pct-wrap"><input class="pct-input" id="cot-iva-pct" type="number" min="0" max="100" step="0.5" value="19" oninput="recalcularTotalCot()" onblur="guardarAIUCot()"> %</span>
           <span class="total-val" id="cot-iva-val">$ 0</span>
         </div>
         <div class="total-row final">
@@ -2228,7 +2228,7 @@
           onchange="cambiarDescripcionCot('${id}', this.value)"></td>
       <td style="text-align:center">${item.unidad || "—"}</td>
       <td><input type="number" class="cell-input" value="${cant}" min="1" style="width:68px"
-          onchange="cambiarCantidadCot('${id}', this.value)"></td>
+          oninput="cambiarCantidadCot('${id}', this.value)"></td>
       <td class="num">${COP(precio)}</td>
       <td class="num vp" id="cvp-${id}" style="font-weight:700">${COP(total)}</td>
       <td><button class="btn-del" onclick="eliminarFilaCot(${id})">✕</button></td>
@@ -2304,6 +2304,24 @@
     window["num_" + id] = setTimeout(() => {
       google.script.run.actualizarItemCotizacion(id, { item_num: val });
     }, 600);
+  }
+
+  // Al cambiar "Cap. #": renumera TODOS los ítems del cuadro como cap.1, cap.2, ...
+  // (un solo capítulo por cotización). Se ve al instante y se guarda en la hoja
+  // (debounced) para que la descarga muestre los mismos números.
+  function renumerarCuadroCot() {
+    const cap = parseInt(document.getElementById("cot-capitulo").value) || 1;
+    let i = 0;
+    document.querySelectorAll("#body-cuadro .crow-main").forEach(row => {
+      i++;
+      const input = row.querySelector("td:first-child input");
+      if (input) input.value = cap + "." + String(i).padStart(2, "0");   // 15.01, 15.02...
+    });
+    if (!cotActual) return;
+    clearTimeout(window._renumCap);
+    window._renumCap = setTimeout(() => {
+      google.script.run.renumerarCuadro(cotActual.id, cap);
+    }, 500);
   }
 
   function cambiarDescripcionCot(id, val) {
@@ -2445,6 +2463,7 @@ function agregarLineaManualUI() {
       const precio     = parseFloat(apu.costo_neto) || 0;
       const tempId     = "t" + Date.now();
       const itemNum    = Object.keys(cotItems).length + 1;
+      const cap        = parseInt(document.getElementById("cot-capitulo").value) || 1;
       const itemNumStr = siguienteItemNum();
       const item       = {
         id:          tempId,
@@ -2460,7 +2479,6 @@ function agregarLineaManualUI() {
       google.script.run
         .withSuccessHandler(res => {
           reemplazarTempIdCot(tempId, res.id);
-          google.script.run.actualizarItemCotizacion(res.id, { item_num: itemNumStr });
           // Cliente / dirección heredados del APU por el servidor (si estaban vacíos).
           const cli = document.getElementById("cot-cliente");
           const dir = document.getElementById("cot-direccion");
@@ -2468,7 +2486,9 @@ function agregarLineaManualUI() {
           if (res.direccion && !dir.value.trim()) dir.value = res.direccion;
         })
         .withFailureHandler(err => showToast("Error: " + err.message, "error"))
-        .agregarAPUaCotizacion(cotActual.id, apuId, cant);
+        // El número (itemNumStr) se guarda directo; el servidor NO renumera el
+        // resto, así se respetan los capítulos escritos a mano.
+        .agregarAPUaCotizacion(cotActual.id, apuId, cant, cap, "", itemNumStr);
     });
   }
 
@@ -2511,7 +2531,7 @@ function agregarLineaManualUI() {
         if (!isNaN(n) && n > max) max = n;
       }
     });
-    return prefix + (max + 1);
+    return prefix + String(max + 1).padStart(2, "0");   // 15.01, 15.02...
   }
 
   function setCotEstado(msg) { document.getElementById("cot-estado").textContent = msg; }

@@ -27,12 +27,18 @@ function crearRecurso(tipo, datos) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const conf  = _bdConf(tipo);
   const sheet = ss.getSheetByName(conf.hoja);
-  const data  = sheet.getDataRange().getValues();
-  const h     = data[0];
-  const lastId = data.length > 1 ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0)) : 0;
-  const newId  = lastId + 1;
-  const row    = h.map(col => conf.campoValor(col, newId, datos));
-  sheet.appendRow(row);
+
+  // Sección crítica: leer max id + append DEBE ser atómico para no duplicar ids.
+  const newId = withLock(() => {
+    const data   = sheet.getDataRange().getValues();
+    const h      = data[0];
+    const lastId = data.length > 1 ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0)) : 0;
+    const id     = lastId + 1;
+    const row    = h.map(col => conf.campoValor(col, id, datos));
+    sheet.appendRow(row);
+    SpreadsheetApp.flush();
+    return id;
+  });
   return { id: newId, ok: true };
 }
 

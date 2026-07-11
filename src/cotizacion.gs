@@ -435,12 +435,17 @@ function llenarHojaCotizacion(sheet, cot) {
   r++;
 
   // ─── AIU + VALOR TOTAL ────────────────────────────────────────────────────────
-  const admVal  = Math.round(valorNeto * admPct  / 100);
-  const impVal  = Math.round(valorNeto * impPct  / 100);
-  const utilVal = Math.round(valorNeto * utilPct / 100);
-  const sinIVA  = valorNeto + admVal + impVal + utilVal;
-  const ivaVal  = Math.round(sinIVA * ivaPct / 100);
-  const total   = sinIVA + ivaVal;
+  // Fórmula ÚNICA compartida con el servidor (recalcularCotizacion) y el frontend.
+  const _t = calcularTotalesCotizacion(valorNeto, {
+    administracion_pct: admPct, imprevistos_pct: impPct,
+    utilidad_pct: utilPct, iva_pct: ivaPct,
+  });
+  const admVal  = _t.admVal;
+  const impVal  = _t.impVal;
+  const utilVal = _t.utilVal;
+  const sinIVA  = _t.sinIVA;
+  const ivaVal  = _t.ivaVal;
+  const total   = _t.total;
 
   const aiuFilas = [
     admPct  > 0 ? ["ADMINISTRACIÓN ("  + admPct  + "%)", admVal]  : null,
@@ -552,46 +557,51 @@ function listarCotizaciones() {
 function crearCotizacion(datos) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Cotizaciones");
-  const data  = sheet.getDataRange().getValues();
+  const fecha = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
 
-  const lastId = data.length > 1
-    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
-    : 0;
-  const newId  = lastId + 1;
+  // Sección crítica: id y número de oferta se derivan del contenido actual de la
+  // hoja; leer + append DEBE ser atómico para no duplicar ids ni números de oferta.
+  return withLock(() => {
+    const data   = sheet.getDataRange().getValues();
+    const lastId = data.length > 1
+      ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+      : 0;
+    const newId  = lastId + 1;
 
-  const year     = new Date().getFullYear();
-  const existing = data.length > 1
-    ? data.slice(1).filter(r => String(r[1] || "").startsWith("OF-" + year)).length
-    : 0;
-  const numero = `OF-${year}-${String(existing + 1).padStart(3, "0")}`;
-  const fecha  = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+    const year     = new Date().getFullYear();
+    const existing = data.length > 1
+      ? data.slice(1).filter(r => String(r[1] || "").startsWith("OF-" + year)).length
+      : 0;
+    const numero = `OF-${year}-${String(existing + 1).padStart(3, "0")}`;
 
-  sheet.appendRow([
-    newId, numero,
-    datos.cliente          || "",
-    datos.direccion        || "",
-    fecha,
-    0,
-    datos.administracion_pct || 0,
-    datos.imprevistos_pct    || 0,
-    datos.utilidad_pct       || 0,
-    datos.iva_pct !== undefined ? datos.iva_pct : 19,
-    0, "No",
-    datos.notas          || "",
-    datos.forma_pago     || "",
-    datos.plazo_entrega  || "",
-    datos.validez_oferta || "",
-    datos.no_incluye     || "",
-  ]);
+    sheet.appendRow([
+      newId, numero,
+      datos.cliente          || "",
+      datos.direccion        || "",
+      fecha,
+      0,
+      datos.administracion_pct || 0,
+      datos.imprevistos_pct    || 0,
+      datos.utilidad_pct       || 0,
+      datos.iva_pct !== undefined ? datos.iva_pct : 19,
+      0, "No",
+      datos.notas          || "",
+      datos.forma_pago     || "",
+      datos.plazo_entrega  || "",
+      datos.validez_oferta || "",
+      datos.no_incluye     || "",
+    ]);
 
-  // Guardar la fecha como TEXTO (formato "@") para que Sheets no la convierta en Date
-  // y se corra un día al leerla. Queda fija exactamente como "dd/MM/yyyy".
-  const fechaCol = data[0].indexOf("fecha") + 1;
-  if (fechaCol > 0) {
-    sheet.getRange(sheet.getLastRow(), fechaCol).setNumberFormat("@").setValue(fecha);
-  }
+    // Guardar la fecha como TEXTO (formato "@") para que Sheets no la convierta en Date
+    // y se corra un día al leerla. Queda fija exactamente como "dd/MM/yyyy".
+    const fechaCol = data[0].indexOf("fecha") + 1;
+    if (fechaCol > 0) {
+      sheet.getRange(sheet.getLastRow(), fechaCol).setNumberFormat("@").setValue(fecha);
+    }
+    SpreadsheetApp.flush();
 
-  return { id: newId, numero_oferta: numero };
+    return { id: newId, numero_oferta: numero };
+  });
 }
 
 // ─── GET COTIZACIÓN COMPLETA ──────────────────────────────────────────────────
@@ -710,9 +720,36 @@ function renumerarCotizacion(ss, cotId) {
     let cap = capIdx >= 0 ? String(data[i][capIdx] || "").trim() : "";
     if (!cap) cap = "1";
     contadorPorCapitulo[cap] = (contadorPorCapitulo[cap] || 0) + 1;
-    const nuevoNum = cap + "." + contadorPorCapitulo[cap];
-    sheet.getRange(i + 1, numIdx + 1).setValue(nuevoNum);
+    // Formato "cap.NN" con el ítem a 2 dígitos: 15.01, 15.02, ... 15.10, 15.11
+    const nuevoNum = cap + "." + String(contadorPorCapitulo[cap]).padStart(2, "0");
+    // Formato texto para conservar el cero adelante (15.01) y que no se vuelva número.
+    sheet.getRange(i + 1, numIdx + 1).setNumberFormat("@").setValue(nuevoNum);
   }
+}
+
+// Asigna el MISMO capítulo a TODOS los ítems de la cotización y renumera
+// (cap.1, cap.2, cap.3...). Es la fuente única de la numeración del cuadro: al
+// escribir el capítulo en el frontend, se persiste aquí para que la descarga
+// muestre los mismos números.
+function renumerarCuadro(cotId, cap) {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet  = ss.getSheetByName("Cotizacion_Items");
+  const data   = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true };
+  const h      = data[0];
+  const cIdx   = h.indexOf("cotizacion_id");
+  const capIdx = h.indexOf("capitulo_num");
+  const capStr = String(parseInt(cap) || 1);
+
+  if (capIdx >= 0) {
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][cIdx] == cotId) {
+        sheet.getRange(i + 1, capIdx + 1).setValue(capStr);
+      }
+    }
+  }
+  renumerarCotizacion(ss, cotId);
+  return { ok: true };
 }
 
 // Cambia el capitulo_num y/o capitulo_nombre de un ítem y renumera la cotización.
@@ -743,37 +780,51 @@ function asignarCapituloItem(itemId, capituloNum, capituloNombre) {
 
 // ─── AGREGAR APU A COTIZACIÓN ─────────────────────────────────────────────────
 
-function agregarAPUaCotizacion(cotId, apuId, cantidad, capituloNum, capituloNombre) {
+function agregarAPUaCotizacion(cotId, apuId, cantidad, capituloNum, capituloNombre, itemNum) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const apu = getAPUCompleto(apuId);
   if (!apu) return { ok: false };
 
   const sheet  = ss.getSheetByName("Cotizacion_Items");
-  const data   = sheet.getDataRange().getValues();
-  const lastId = data.length > 1
-    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
-    : 0;
-  const newId  = lastId + 1;
 
   const cant      = parseFloat(cantidad) || 1;
   const precioAPU = parseFloat(apu.costo_neto) || 0;
   const valTotal  = cant * precioAPU;
   const cap       = String(capituloNum || "1").trim() || "1";
   const capNom    = String(capituloNombre || "").trim();
+  // El número del ítem lo decide el frontend (siguiente bajo el capítulo actual) y
+  // se guarda TAL CUAL. NO renumeramos todo el cuadro al agregar: eso pisaría los
+  // capítulos que el usuario haya escrito a mano en las otras filas.
+  const numItem   = String(itemNum || "").trim();
 
-  // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion,
-  // unidad, cantidad, precio_apu, valor_total, capitulo_num, capitulo_nombre
-  sheet.appendRow([
-    newId, cotId, apuId, "",            // item_num se asigna en renumerarCotizacion
-    apu.actividad || apu.descripcion || apu.codigo_item || "",
-    apu.unidad || "",
-    cant, precioAPU, valTotal,
-    cap, capNom
-  ]);
+  // Sección crítica: leer max id + append DEBE ser atómico para no duplicar ids.
+  const newId = withLock(() => {
+    const data   = sheet.getDataRange().getValues();
+    const lastId = data.length > 1
+      ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+      : 0;
+    const id = lastId + 1;
+    // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion,
+    // unidad, cantidad, precio_apu, valor_total, capitulo_num, capitulo_nombre
+    // La celda item_num se fuerza a formato texto para que Sheets no convierta
+    // "15.1" en el número 15.1 (que perdería el "15.10").
+    sheet.appendRow([
+      id, cotId, apuId, "",
+      apu.actividad || apu.descripcion || apu.codigo_item || "",
+      apu.unidad || "",
+      cant, precioAPU, valTotal,
+      cap, capNom
+    ]);
+    const numCol = data[0].indexOf("item_num") + 1;
+    if (numCol > 0 && numItem) {
+      sheet.getRange(sheet.getLastRow(), numCol).setNumberFormat("@").setValue(numItem);
+    }
+    SpreadsheetApp.flush(); // asegurar que la fila queda escrita antes de soltar el lock
+    return id;
+  });
 
   const datosCliente = heredarDatosClienteSiVacios(ss, cotId, apu);
-  renumerarCotizacion(ss, cotId);
   recalcularCotizacion(ss, cotId);
 
   return {
@@ -1144,14 +1195,17 @@ function recalcularCotizacion(ss, cotId) {
 
   for (let i = 1; i < cotData.length; i++) {
     if (cotData[i][0] == cotId) {
-      const admin  = parseFloat(cotData[i][cotH.indexOf("administracion_pct")]) || 0;
-      const imprev = parseFloat(cotData[i][cotH.indexOf("imprevistos_pct")])    || 0;
-      const util   = parseFloat(cotData[i][cotH.indexOf("utilidad_pct")])       || 0;
-      const iva    = parseFloat(cotData[i][cotH.indexOf("iva_pct")])            || 0;
-      const sinIVA     = valorNeto * (1 + admin/100 + imprev/100 + util/100);
-      const valorTotal = Math.round(sinIVA * (1 + iva/100));
-      cotSheet.getRange(i + 1, cotH.indexOf("valor_neto")  + 1).setValue(Math.round(valorNeto));
-      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(valorTotal);
+      // Normalizar % guardados como decimal (0.05 → 5) igual que en las lecturas.
+      const norm = k => { const v = parseFloat(cotData[i][cotH.indexOf(k)]) || 0; return (v > 0 && v < 1) ? v * 100 : v; };
+      // Fórmula ÚNICA compartida con el documento del cliente y el frontend.
+      const t = calcularTotalesCotizacion(valorNeto, {
+        administracion_pct: norm("administracion_pct"),
+        imprevistos_pct:    norm("imprevistos_pct"),
+        utilidad_pct:       norm("utilidad_pct"),
+        iva_pct:            norm("iva_pct"),
+      });
+      cotSheet.getRange(i + 1, cotH.indexOf("valor_neto")  + 1).setValue(t.neto);
+      cotSheet.getRange(i + 1, cotH.indexOf("valor_total") + 1).setValue(t.total);
       break;
     }
   }
@@ -1227,6 +1281,14 @@ function actualizarItemCotizacion(itemId, cambios) {
       row[h.indexOf("valor_total")] = cant * precio;
 
       sheet.getRange(i + 1, 1, 1, h.length).setValues([row]);
+      // item_num se guarda como TEXTO para respetar el capítulo libre tal cual lo
+      // escribió el usuario (que "16.10" no se convierta en el número 16.1).
+      if (cambios.item_num !== undefined) {
+        const numCol = h.indexOf("item_num");
+        if (numCol >= 0) {
+          sheet.getRange(i + 1, numCol + 1).setNumberFormat("@").setValue(String(cambios.item_num));
+        }
+      }
       recalcularCotizacion(ss, cotId);
       return { ok: true, valor_total: cant * precio };
     }
@@ -1238,23 +1300,28 @@ function actualizarItemCotizacion(itemId, cambios) {
 function agregarLineaManual(cotId, datos) {
   const ss     = SpreadsheetApp.getActiveSpreadsheet();
   const sheet  = ss.getSheetByName("Cotizacion_Items");
-  const data   = sheet.getDataRange().getValues();
-  const lastId = data.length > 1
-    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
-    : 0;
-  const newId  = lastId + 1;
 
   const cant   = parseFloat(datos.cantidad)   || 0;
   const precio = parseFloat(datos.precio_apu) || 0;
 
-  // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion, unidad, cantidad, precio_apu, valor_total
-  sheet.appendRow([
-    newId, cotId, "",
-    datos.item_num    || "",
-    datos.descripcion || "",
-    datos.unidad      || "",
-    cant, precio, cant * precio
-  ]);
+  // Sección crítica: leer max id + append DEBE ser atómico para no duplicar ids.
+  const newId = withLock(() => {
+    const data   = sheet.getDataRange().getValues();
+    const lastId = data.length > 1
+      ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+      : 0;
+    const id = lastId + 1;
+    // Orden de columnas: id, cotizacion_id, apu_id, item_num, descripcion, unidad, cantidad, precio_apu, valor_total
+    sheet.appendRow([
+      id, cotId, "",
+      datos.item_num    || "",
+      datos.descripcion || "",
+      datos.unidad      || "",
+      cant, precio, cant * precio
+    ]);
+    SpreadsheetApp.flush();
+    return id;
+  });
 
   recalcularCotizacion(ss, cotId);
   return { id: newId, valor_total: cant * precio };
@@ -1266,28 +1333,36 @@ function agregarLineaManual(cotId, datos) {
 function agregarVariasLineas(cotId, lineas) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Cotizacion_Items");
-  const data  = sheet.getDataRange().getValues();
-  let nextId  = (data.length > 1
-    ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
-    : 0) + 1;
 
-  const filas = (lineas || []).map(l => {
-    const cant   = parseFloat(l.cantidad)   || 0;
-    const precio = parseFloat(l.precio_apu) || 0;
-    return [
-      nextId++, cotId, "",
-      l.item_num    || "",
-      l.descripcion || "",
-      l.unidad      || "",
-      cant, precio, cant * precio
-    ];
+  if (!(lineas || []).length) return { ok: true, count: 0 };
+
+  // Sección crítica: leer max id + escribir el bloque DEBE ser atómico.
+  const count = withLock(() => {
+    const data  = sheet.getDataRange().getValues();
+    let nextId  = (data.length > 1
+      ? Math.max(...data.slice(1).map(r => parseInt(r[0]) || 0))
+      : 0) + 1;
+
+    const filas = lineas.map(l => {
+      const cant   = parseFloat(l.cantidad)   || 0;
+      const precio = parseFloat(l.precio_apu) || 0;
+      return [
+        nextId++, cotId, "",
+        l.item_num    || "",
+        l.descripcion || "",
+        l.unidad      || "",
+        cant, precio, cant * precio
+      ];
+    });
+
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, filas.length, filas[0].length).setValues(filas);
+    SpreadsheetApp.flush();
+    return filas.length;
   });
-  if (!filas.length) return { ok: true, count: 0 };
 
-  const startRow = sheet.getLastRow() + 1;
-  sheet.getRange(startRow, 1, filas.length, filas[0].length).setValues(filas);
   recalcularCotizacion(ss, cotId);
-  return { ok: true, count: filas.length };
+  return { ok: true, count: count };
 }
 
 // ─── RENDER DOCUMENTO DEL CLIENTE (tabla limpia, sin desglose) ───────────────
@@ -1397,12 +1472,17 @@ function llenarHojaCotizacionCliente(sheet, cot) {
   }
 
   // ── TOTALES (Subtotal + AIU + IVA + Total) ──
-  const admVal  = Math.round(valorNeto * admPct  / 100);
-  const impVal  = Math.round(valorNeto * impPct  / 100);
-  const utilVal = Math.round(valorNeto * utilPct / 100);
-  const sinIVA  = valorNeto + admVal + impVal + utilVal;
-  const ivaVal  = Math.round(sinIVA * ivaPct / 100);
-  const total   = sinIVA + ivaVal;
+  // Fórmula ÚNICA compartida con el servidor (recalcularCotizacion) y el frontend.
+  const _t = calcularTotalesCotizacion(valorNeto, {
+    administracion_pct: admPct, imprevistos_pct: impPct,
+    utilidad_pct: utilPct, iva_pct: ivaPct,
+  });
+  const admVal  = _t.admVal;
+  const impVal  = _t.impVal;
+  const utilVal = _t.utilVal;
+  const sinIVA  = _t.sinIVA;
+  const ivaVal  = _t.ivaVal;
+  const total   = _t.total;
 
   const filasTot = [["SUBTOTAL", valorNeto]];
   if (admPct  > 0) filasTot.push(["ADMINISTRACIÓN (" + admPct  + "%)", admVal]);
