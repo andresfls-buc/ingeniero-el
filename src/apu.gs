@@ -1071,3 +1071,65 @@ function sheetToObjects(ss, name) {
     return obj;
   });
 }
+
+// ─── DUPLICAR APU ─────────────────────────────────────────────────────────────
+// Crea un APU independiente copiando cabeza + ítems del origen.
+// El marcador "(copia)" vive SOLO en codigo_item (interno). La descripción se guarda
+// LIMPIA para que el fallback de la cotización (actividad || descripcion || codigo_item)
+// nunca muestre el marcador al cliente.
+function duplicarAPU(apuId) {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const src = getAPUCompleto(apuId);
+  if (!src) throw new Error("APU no encontrado: " + apuId);
+
+  // Código de la copia: leer todos los codigo_item existentes y pedir el siguiente libre.
+  const apuSheet = ss.getSheetByName("APU");
+  const apuData  = apuSheet.getDataRange().getValues();
+  const colCod   = apuData[0].indexOf("codigo_item");
+  const codigos  = apuData.slice(1).map(function (r) { return r[colCod]; });
+  const nuevoCodigo = siguienteCodigoCopia(src.codigo_item, codigos);
+
+  // Descripción limpia (código base, sin "(copia)").
+  const descLimpia = String(src.codigo_item || "")
+    .replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim();
+
+  // 1) Cabeza (crearAPU arranca subtotales en 0).
+  const newId = crearAPU({
+    codigo_item: nuevoCodigo,
+    descripcion: descLimpia,
+    unidad:      src.unidad,
+    cliente:     src.cliente,
+    direccion:   src.direccion,
+    actividad:   src.actividad,
+  });
+
+  // 2) AIU / desperdicio / HM.
+  actualizarCabezaAPU(newId, {
+    administracion_pct:    src.administracion_pct,
+    imprevistos_pct:       src.imprevistos_pct,
+    utilidad_pct:          src.utilidad_pct,
+    iva_pct:               src.iva_pct,
+    desperdicio_pct:       src.desperdicio_pct,
+    herramienta_menor_pct: src.herramienta_menor_pct,
+  });
+
+  // 3) Copiar ítems. El último agregarItemAPU recalcula subtotales + costo_neto + valor_total.
+  const items = []
+    .concat(src.equipos    || [])
+    .concat(src.materiales || [])
+    .concat(src.mano_obra  || [])
+    .concat(src.otros      || []);
+
+  items.forEach(function (it) {
+    agregarItemAPU(newId, {
+      tipo:               it.tipo,
+      recurso_id:         it.recurso_id,
+      descripcion_manual: it.descripcion_manual,
+      cantidad:           it.cantidad,
+      rendimiento:        it.rendimiento,
+      precio_unitario:    it.precio_unitario,
+    });
+  });
+
+  return { id: newId };
+}
