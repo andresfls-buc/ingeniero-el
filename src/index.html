@@ -53,6 +53,9 @@
     .btn-dup      { background: none; border: 1px solid #607d8b; color: #455a64; border-radius: 3px; padding: 3px 10px; cursor: pointer; font-size: 11px; white-space: nowrap; }
     .btn-dup:hover:not(:disabled) { background: #eceff1; }
     .btn-dup:disabled { opacity: .6; cursor: default; }
+    .version-badge { background:none; border:none; color:rgba(255,255,255,.85); cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:6px; padding:2px 4px; }
+    .version-badge:hover { color:#fff; text-decoration:underline; }
+    .version-nuevo { background:#ff5252; color:#fff; border-radius:10px; padding:1px 7px; font-size:10px; font-weight:700; }
 
     /* ── BOTONES DE ACCIÓN (con estados) ── */
     .btn-action {
@@ -773,6 +776,10 @@
 <div id="v-lista">
   <div class="toolbar">
     <h1>Sistema APU</h1>
+    <button id="btn-version" class="version-badge" onclick="abrirNovedades()" title="¿Qué hay de nuevo?">
+      <span id="version-num">v–</span>
+      <span id="version-nuevo" class="version-nuevo" style="display:none">● Nuevo</span>
+    </button>
     <div class="tab-group">
       <button class="tab-btn active" id="tab-apus" onclick="irTabAPUs()">APUs</button>
       <button class="tab-btn" id="tab-cots" onclick="irTabCots()">Cotizaciones</button>
@@ -1315,10 +1322,65 @@
   </div>
 </div>
 
+<!-- MODAL: NOVEDADES / CHANGELOG -->
+<div id="modal-novedades" class="dlg-overlay">
+  <div class="dlg-box">
+    <div class="dlg-body">
+      <p style="font-size:15px;font-weight:700;margin-bottom:12px;color:#1a237e">¿Qué hay de nuevo?</p>
+      <div id="novedades-lista"></div>
+    </div>
+    <div class="dlg-footer" style="justify-content:center">
+      <button class="dlg-btn-ok blue" onclick="cerrarNovedades()" style="min-width:110px">Entendido</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const COP = v => new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', maximumFractionDigits: 0
   }).format(v || 0);
+
+  // ── VERSIÓN / CHANGELOG (fuente única: el número sale de CHANGELOG[0].v) ──
+  const CHANGELOG = [
+    { v: "1.1", fecha: "16/07/2026", cambios: ["Ahora puedes duplicar APUs para reusarlos"] },
+    { v: "1.0", fecha: "16/07/2026", cambios: ["Versión inicial del Sistema APU"] },
+  ];
+  const APP_VERSION = CHANGELOG[0].v;
+
+  function versionVista() {
+    try { return localStorage.getItem("apu_version_vista"); } catch (e) { return null; }
+  }
+  function marcarVersionVista() {
+    try { localStorage.setItem("apu_version_vista", APP_VERSION); } catch (e) {}
+  }
+
+  function initVersion() {
+    const numEl = document.getElementById("version-num");
+    if (numEl) numEl.textContent = "v" + APP_VERSION;
+    const nuevoEl = document.getElementById("version-nuevo");
+    if (nuevoEl) nuevoEl.style.display = (versionVista() !== APP_VERSION) ? "" : "none";
+  }
+
+  function abrirNovedades() {
+    const html = CHANGELOG.map(function (e) {
+      const items = e.cambios.map(function (c) { return "<li>" + c + "</li>"; }).join("");
+      return '<div style="margin-bottom:14px">' +
+               '<div style="font-weight:700;color:#222">v' + e.v +
+                 ' <span style="font-weight:400;color:#888;font-size:12px">· ' + e.fecha + '</span></div>' +
+               '<ul style="margin:6px 0 0 18px;color:#444;font-size:13px;line-height:1.5">' + items + '</ul>' +
+             '</div>';
+    }).join("");
+    document.getElementById("novedades-lista").innerHTML = html;
+    document.getElementById("modal-novedades").style.display = "flex";
+    // El cliente ya vio la versión actual → recordar y ocultar el aviso.
+    marcarVersionVista();
+    const nuevoEl = document.getElementById("version-nuevo");
+    if (nuevoEl) nuevoEl.style.display = "none";
+  }
+
+  function cerrarNovedades() {
+    document.getElementById("modal-novedades").style.display = "none";
+  }
 
   const formatFecha = f => {
     if (!f) return '—';
@@ -1364,6 +1426,7 @@
 
   // ═══ INICIALIZACIÓN ═══════════════════════════════════════════════════════
   function init() {
+    initVersion();
     mostrarLista();
   }
 
